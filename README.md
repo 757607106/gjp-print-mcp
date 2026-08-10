@@ -1,0 +1,277 @@
+# GJP 云打印模板样式 MCP
+
+基于 AgentScope 2.0.4 的云打印 MCP 服务。对外只发布三个模板样式工具，供视觉
+模型根据用户图片还原模板并保存到云打印业务系统。
+
+## MCP 工具
+
+| 工具 | 业务 API | 参数 |
+|---|---|---|
+| `get_print_info` | `/ElectronPrintApi/GetPrintInfo` | `report_name`；`reportType` 固定为 1 |
+| `new_style` | `/ElectronPrintApi/NewStyle` | `report_name`、`report_type`、`style_name` |
+| `save_style` | `/ElectronPrintApi/SaveStyle` | `report_name`、`report_type`、`style_name`、`style_id`、`style_content` |
+
+Token 不属于工具参数。MCP 客户端通过 `Authorization: Bearer <云打印Token>`
+动态传入，服务端 Adapter 再把 Token 注入三个业务 API 的请求体。
+
+## 动态参数
+
+对接方每次调用 MCP 时，同时提供当前用户的 Token 和本次的
+`report_name`：Token 放在该 MCP HTTP 请求的 `Authorization` 头中，
+`report_name` 放在 `tools/call.params.arguments` 中。两个值都是每次请求动态传入，
+`reportType=1` 由 MCP 服务端固定补全。
+
+| 业务字段 | MCP 传入方式 | 来源 | 规则 |
+|---|---|---|---|
+| `token` | 当次 MCP 请求的 `Authorization: Bearer <Token>` | 对接方 | 每次请求动态注入，不出现在工具 Schema 中 |
+| `reportName` | `report_name` | 图片识别或用户输入 | 三个工具均为动态值 |
+| `reportType` | `report_type` | 业务上下文 | GetPrintInfo 固定为 `1`；NewStyle/SaveStyle 动态传入 |
+| `styleName` | `style_name` | 用户命名 | NewStyle 动态传入；SaveStyle 必须沿用 NewStyle 返回值 |
+| `styleId` | `style_id` | NewStyle 响应 | SaveStyle 动态传入，必须作为字符串保留 |
+| `styleContent` | `style_content` | 模板 JSON 生成/编辑逻辑 | 传入完整 JSON 对象，由服务端序列化 |
+
+GetPrintInfo 的完整 MCP 调用形式：
+
+```http
+POST /mcp
+Authorization: Bearer <对接方本次动态传入的Token>
+Mcp-Session-Id: <initialize返回的会话ID>
+Content-Type: application/json
+```
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "get_print_info",
+    "arguments": {
+      "report_name": "销售单"
+    }
+  }
+}
+```
+
+MCP 服务从同一请求中取出 Token 和 `report_name`，再生成：
+
+```json
+{
+  "token": "<本次请求的Token>",
+  "reportName": "销售单",
+  "reportType": 1,
+  "styleName": "",
+  "styleId": "",
+  "styleContent": "",
+  "isDynamicBaseStyle": "",
+  "baseStyleContent": "",
+  "isPublic": false
+}
+```
+
+三个 MCP 工具的动态调用关系：
+
+```text
+get_print_info(
+  report_name=图片识别得到的分类
+)
+
+new_style(
+  report_name=上一步的分类,
+  report_type=当前业务类型,
+  style_name=用户指定的新模板名称
+)
+
+save_style(
+  report_name=new_style.reportName,
+  report_type=new_style.reportType,
+  style_name=new_style.styleName,
+  style_id=new_style.styleId,
+  style_content=生成的完整模板 JSON
+)
+```
+
+## 图片还原流程
+
+```text
+用户图片
+  → 视觉模型识别报表名称、字段和布局
+  → get_print_info(report_name)
+  → 生成完整的云打印原生模板 JSON
+  → new_style(report_name, report_type, style_name)
+  → save_style(
+        使用 new_style 返回的 reportName/reportType/styleName/styleId,
+        style_content=生成的模板 JSON 对象
+    )
+```
+
+`style_id` 始终作为字符串传递，避免超大整数精度丢失。`new_style` 和
+`save_style` 不自动重试；创建成功后保存失败，应使用同一 `style_id` 重试保存，
+不能重复创建空模板。
+
+## 多轮编辑
+
+服务端按 `tenant_id / account_id / session_id / report_name` 保存当前模板。
+Streamable HTTP 初始化时服务端签发 `Mcp-Session-Id`，客户端后续自动
+回传，因此同一 Token 下的不同对话也会隔离。未提供会话头时才回退为
+Token 哈希会话。首次
+`new_style` 后记录模板身份，首次 `save_style` 后记录完整 JSON；后续调用
+`get_print_info(report_name)` 会同时返回：
+
+```json
+{
+  "currentStyle": {
+    "reportName": "销售单",
+    "reportType": 1,
+    "styleName": "图片还原模板",
+    "styleId": "2086707921336647680",
+    "revision": 2,
+    "hasContent": true,
+    "styleContent": {"ReportName": "销售单", "Pages": []}
+  }
+}
+```
+
+模型以 `currentStyle.styleContent` 为基线，只修改用户本轮指定内容，再使用同一个
+`styleId` 调用 `save_style`。只有用户明确要求另存为新模板时才调用 `new_style`。
+
+参考实现使用进程内状态，支持同一服务进程内多轮对话；服务重启会丢失状态，多副本
+部署应把 `TemplateConversationStore` 替换为共享存储。
+
+## 模板 JSON 生成内核
+
+模板 JSON 的字段提取、计划、布局、编译、补丁和校验代码继续保留为内部领域能力，
+不作为额外 MCP 工具发布：
+
+| 模块 | 职责 |
+|---|---|
+| `catalog.py` | 字段目录与原生绑定提取 |
+| `domain.py` | 模板计划和领域对象 |
+| `planner.py` / `plan_builder.py` | 构造模板计划 |
+| `paper.py` | 纸张与页面规则 |
+| `native.py` | 原生模板 JSON 编译、补丁、校验与哈希 |
+| `reports.py` | 线上模板上下文和页面信息 |
+| `service.py` | 模板生成编排 |
+| `template_schema.py` | 模板生成计划的 Pydantic 输入模型 |
+| `conversation.py` | 三个工具之间的当前模板状态与修订号 |
+
+这套内核生成的原生模板对象可直接传给 `save_style.style_content`。
+
+## 快速启动
+
+运行要求：Python 3.11 或更高版本，并已安装 `uv`。
+
+### 1. 安装依赖
+
+```bash
+cd /path/to/gjp-print-mcp
+uv sync
+```
+
+本地开发和执行测试时使用：
+
+```bash
+uv sync --extra dev
+```
+
+### 2. 配置服务
+
+可在项目根目录创建 `.env`：
+
+```dotenv
+YUNPRINT_BASE_URL=https://yunprint.gmgrasp.com.cn
+YUNPRINT_TIMEOUT_SECONDS=30
+GJP_LOG_ENABLED=true
+GJP_LOG_LEVEL=INFO
+```
+
+也可以使用同名进程环境变量；进程环境变量优先于 `.env`。
+
+| 变量 | 必填 | 默认值 | 说明 |
+|---|---|---|---|
+| `YUNPRINT_BASE_URL` | 是 | - | 云打印平台 HTTPS 根地址，不包含三个 API 路径 |
+| `YUNPRINT_TIMEOUT_SECONDS` | 否 | 30 | 三个业务 API 的超时时间（秒） |
+| `GJP_LOG_ENABLED` | 否 | false | 是否开启终端日志 |
+| `GJP_LOG_LEVEL` | 否 | INFO | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
+
+云打印 Token 不写入 `.env`，而是由每个 MCP 客户端连接通过
+`Authorization` 请求头动态传入。
+
+### 3. 启动 MCP
+
+本地启动：
+
+```bash
+uv run python -m yunprint --host 127.0.0.1 --port 8931
+```
+
+容器、服务器或局域网启动：
+
+```bash
+uv run uvicorn yunprint.app:app --host 0.0.0.0 --port 8931 --workers 1
+```
+
+启动后的首选 MCP 地址为 `http://127.0.0.1:8931/mcp`，传输类型为
+Streamable HTTP。生产环境应在反向代理层配置 HTTPS。
+
+> 当前多轮模板状态保存在进程内存中，因此必须使用单 worker。
+> 启用 Redis/数据库共享状态后才能安全扩展为多 worker 或多副本。
+
+## 连接 MCP
+
+支持 Streamable HTTP 的 Agent 平台使用以下配置：
+
+```json
+{
+  "mcpServers": {
+    "yunprint-print": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:8931/mcp",
+      "headers": {
+        "Authorization": "Bearer <云打印Token>"
+      }
+    }
+  }
+}
+```
+
+不同 Agent 平台的配置字段名可能不同，但必须保持这三项：
+
+| 配置项 | 值 |
+|---|---|
+| 传输 | Streamable HTTP |
+| URL | `http(s)://<MCP服务地址>/mcp` |
+| Header | `Authorization: Bearer <云打印Token>` |
+
+MCP 服务在 `initialize` 响应中签发 `Mcp-Session-Id`。标准 MCP 客户端会在
+后续请求中自动携带它，不要在配置文件里写死该请求头。同一轮对话
+必须复用同一 MCP 会话，才能继续编辑 `currentStyle`。
+
+连接成功后应只能发现：
+
+1. `get_print_info`
+2. `new_style`
+3. `save_style`
+
+### 连接排查
+
+| 现象 | 检查项 |
+|---|---|
+| 404 | URL 必须以 `/mcp` 结尾 |
+| `MCP_UNAUTHORIZED` | 检查 `Authorization` 是否为 `Bearer <Token>` |
+| 缺少或无效 `Mcp-Session-Id` | 确认客户端支持有状态 Streamable HTTP，并复用初始化会话 |
+| `BUSINESS_CONNECTION_INVALID` | 检查服务端 `YUNPRINT_BASE_URL` |
+| `YUNPRINT_REQUEST_FAILED` | 检查云打印 Token、网络和云打印 API 状态 |
+
+更完整的部署、反向代理和手工握手验证方式见
+[SaaS 与三接口 MCP 接入](architecture/saas-mcp-integration.md)。
+
+## 测试
+
+```bash
+uv run pytest -q
+```
+
+三个工具的请求契约、动态 Token 注入、权限和 Schema 测试位于
+`tests/printing/test_style_*.py`；模板 JSON 生成内核的测试继续保留在
+`tests/printing/`。

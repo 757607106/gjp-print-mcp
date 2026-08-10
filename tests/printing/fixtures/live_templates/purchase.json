@@ -1,0 +1,699 @@
+{
+  "ReportName": "进货单.rwx",
+  "PageSetting": {
+    "PrinterName": "默认打印机",
+    "PaperName": "自定义纸张",
+    "SavePrinterName": 1,
+    "LeftMarginUM": 50,
+    "TopMarginUM": 50,
+    "BottomMarginUM": 50,
+    "RightMarginUM": 50,
+    "PaperOrientation": 0,
+    "PaperBin": 7,
+    "PaperHeightUM": 1390,
+    "FixedRowCount": 1,
+    "AutoCalRowCount": 0,
+    "ShowTotalInPerPage": 0,
+    "MaxRowCount": 10,
+    "BkImageStr": "",
+    "ImagePath": ""
+  },
+  "Pages": [
+    {
+      "ClassName": "TTemplatePage",
+      "Width": 794,
+      "Height": 525,
+      "ReportElements": [
+        {
+          "ClassName": "TTableElement",
+          "Left": 10,
+          "Top": 19,
+          "Width": 1008,
+          "Height": 205,
+          "ElementKind": 0,
+          "ElementText": "",
+          "FieldName": "",
+          "Rows": [
+            {
+              "ClassName": "TRow",
+              "Left": 10,
+              "Top": 10,
+              "Cells": [
+                {
+                  "CellText": "@公司全名",
+                  "OrigHeight": 31,
+                  "OrigWidth": 327,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 2,
+                  "VertAlign": 0,
+                  "FontSize": 20,
+                  "FontName": "楷体_GB2312",
+                  "FontStyle": "fsBold"
+                },
+                {
+                  "CellText": "进货单",
+                  "OrigHeight": 31,
+                  "OrigWidth": 327,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 0,
+                  "FontSize": 20,
+                  "FontName": "楷体_GB2312",
+                  "FontStyle": "fsBold"
+                },
+                {
+                  "CellText": "`总页码",
+                  "OrigHeight": 31,
+                  "OrigWidth": 102,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 0,
+                  "FontSize": 12,
+                  "FontName": "楷体_GB2312",
+                  "FontStyle": "fsBold"
+                }
+              ]
+            },
+            {
+              "ClassName": "TRow",
+              "Left": 10,
+              "Top": 41,
+              "Cells": [
+                {
+                  "CellText": "收货仓库：",
+                  "OrigWidth": 88,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@收货仓库",
+                  "OrigWidth": 205,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "录单日期：",
+                  "OrigWidth": 87,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@录单日期",
+                  "OrigWidth": 131,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "单据编号：",
+                  "OrigWidth": 93,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@单据编号",
+                  "OrigWidth": 152,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                }
+              ]
+            },
+            {
+              "ClassName": "TRow",
+              "Left": 10,
+              "Top": 61,
+              "Cells": [
+                {
+                  "CellText": "供货单位：",
+                  "OrigWidth": 88,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@供货单位",
+                  "OrigWidth": 205,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "联系人：",
+                  "OrigWidth": 87,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@联系人一",
+                  "OrigWidth": 131,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "联系电话：",
+                  "OrigWidth": 99,
+                  "LeftLine": 0,
+                  "LeftLineWidth": 0,
+                  "LeftLineStyle": 2,
+                  "RightLine": 0,
+                  "RightLineWidth": 0,
+                  "RightLineStyle": 2,
+                  "TopLine": 0,
+                  "TopLineWidth": 0,
+                  "TopLineStyle": 2,
+                  "BottomLine": 0,
+                  "BottomLineWidth": 0,
+                  "BottomLineStyle": 2,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@电话",
+                  "OrigWidth": 146,
+                  "LeftLine": 0,
+                  "LeftLineWidth": 0,
+                  "LeftLineStyle": 2,
+                  "RightLine": 0,
+                  "RightLineWidth": 0,
+                  "RightLineStyle": 2,
+                  "TopLine": 0,
+                  "TopLineWidth": 0,
+                  "TopLineStyle": 2,
+                  "BottomLine": 0,
+                  "BottomLineWidth": 0,
+                  "BottomLineStyle": 2,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                }
+              ]
+            },
+            {
+              "ClassName": "TRow",
+              "Left": 10,
+              "Top": 81,
+              "Cells": [
+                {
+                  "CellText": "联系地址：",
+                  "OrigWidth": 88,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@地址",
+                  "OrigWidth": 205,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "摘要：",
+                  "OrigWidth": 87,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@摘要",
+                  "OrigWidth": 376,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                }
+              ]
+            },
+            {
+              "ClassName": "TRow",
+              "Left": 10,
+              "Top": 101,
+              "Cells": [
+                {
+                  "CellText": "编号",
+                  "OrigHeight": 24,
+                  "OrigWidth": 74,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "商  品  全  名",
+                  "OrigHeight": 24,
+                  "OrigWidth": 198,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "仓库全名",
+                  "OrigHeight": 24,
+                  "OrigWidth": 138,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "单位",
+                  "OrigHeight": 24,
+                  "OrigWidth": 51,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "数量",
+                  "OrigHeight": 24,
+                  "OrigWidth": 59,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "单 价",
+                  "OrigHeight": 24,
+                  "OrigWidth": 71,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "金  额",
+                  "OrigHeight": 24,
+                  "OrigWidth": 85,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "单据备注",
+                  "OrigHeight": 24,
+                  "OrigWidth": 80,
+                  "FontSize": 11
+                }
+              ]
+            },
+            {
+              "ClassName": "TRow",
+              "Left": 10,
+              "Top": 125,
+              "Cells": [
+                {
+                  "CellText": "#商品编号",
+                  "OrigHeight": 24,
+                  "OrigWidth": 74,
+                  "HorzAlign": 0,
+                  "FontSize": 11,
+                  "WordWrap": 0
+                },
+                {
+                  "CellText": "#商品全名",
+                  "OrigHeight": 24,
+                  "OrigWidth": 198,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "#仓库全名",
+                  "OrigHeight": 24,
+                  "OrigWidth": 138,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "#单位",
+                  "OrigHeight": 24,
+                  "OrigWidth": 51,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "#数量",
+                  "OrigHeight": 24,
+                  "OrigWidth": 59,
+                  "HorzAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "#单价",
+                  "OrigHeight": 24,
+                  "OrigWidth": 71,
+                  "HorzAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "#金额",
+                  "OrigHeight": 24,
+                  "OrigWidth": 85,
+                  "HorzAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "#单据备注",
+                  "OrigHeight": 24,
+                  "OrigWidth": 80,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                }
+              ]
+            },
+            {
+              "ClassName": "TRow",
+              "Left": 10,
+              "Top": 149,
+              "Cells": [
+                {
+                  "CellText": "总计大写",
+                  "OrigHeight": 24,
+                  "OrigWidth": 74,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "FormatKind": 1,
+                  "CellText": "~金额",
+                  "OrigHeight": 24,
+                  "OrigWidth": 387,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "^数量",
+                  "OrigHeight": 24,
+                  "OrigWidth": 59,
+                  "HorzAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "页小计：",
+                  "OrigHeight": 24,
+                  "OrigWidth": 71,
+                  "RightLine": 0,
+                  "HorzAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "!金额",
+                  "OrigHeight": 24,
+                  "OrigWidth": 139,
+                  "RightLine": 0,
+                  "HorzAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "元",
+                  "OrigHeight": 24,
+                  "OrigWidth": 26,
+                  "LeftLine": 0,
+                  "HorzAlign": 0,
+                  "FontSize": 11
+                }
+              ]
+            },
+            {
+              "ClassName": "TRow",
+              "Left": 10,
+              "Top": 173,
+              "Cells": [
+                {
+                  "CellText": "付款账户",
+                  "OrigHeight": 19,
+                  "OrigWidth": 74,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@付款账户",
+                  "OrigHeight": 19,
+                  "OrigWidth": 198,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "付款金额",
+                  "OrigHeight": 19,
+                  "OrigWidth": 75,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@付款金额",
+                  "OrigHeight": 19,
+                  "OrigWidth": 148,
+                  "RightLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "元",
+                  "OrigHeight": 19,
+                  "OrigWidth": 25,
+                  "LeftLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "优惠金额",
+                  "OrigHeight": 19,
+                  "OrigWidth": 71,
+                  "HorzAlign": 2,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@优惠金额",
+                  "OrigHeight": 19,
+                  "OrigWidth": 139,
+                  "RightLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "元",
+                  "OrigHeight": 19,
+                  "OrigWidth": 26,
+                  "LeftLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "OrigHeight": 19,
+                  "OrigWidth": 126,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "OrigHeight": 19,
+                  "OrigWidth": 126,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                }
+              ]
+            },
+            {
+              "ClassName": "TRow",
+              "Left": 10,
+              "Top": 192,
+              "Cells": [
+                {
+                  "CellText": "制单人：",
+                  "OrigHeight": 23,
+                  "OrigWidth": 74,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@制单人",
+                  "OrigHeight": 23,
+                  "OrigWidth": 114,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "经手人:",
+                  "OrigHeight": 23,
+                  "OrigWidth": 69,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "@经手人",
+                  "OrigHeight": 23,
+                  "OrigWidth": 108,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "打印日期：",
+                  "OrigHeight": 23,
+                  "OrigWidth": 100,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "CellText": "`时间日期",
+                  "OrigHeight": 23,
+                  "OrigWidth": 291,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "OrigHeight": 23,
+                  "OrigWidth": 126,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                },
+                {
+                  "OrigHeight": 23,
+                  "OrigWidth": 126,
+                  "LeftLine": 0,
+                  "RightLine": 0,
+                  "TopLine": 0,
+                  "BottomLine": 0,
+                  "HorzAlign": 0,
+                  "VertAlign": 2,
+                  "FontSize": 11
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "GroupInfo": {
+        "FieldName": ""
+      },
+      "OrderInfoList": [],
+      "BandAreas": [
+        {
+          "ClassName": "TBandArea",
+          "IsVisible": 1,
+          "BandKind": 1,
+          "BandTop": 0,
+          "BandHeight": 19
+        },
+        {
+          "ClassName": "TBandArea",
+          "IsVisible": 0,
+          "BandKind": 2,
+          "BandTop": 19,
+          "BandHeight": 100
+        },
+        {
+          "ClassName": "TBandArea",
+          "IsVisible": 1,
+          "BandKind": 3,
+          "BandTop": 19,
+          "BandHeight": 487
+        },
+        {
+          "ClassName": "TBandArea",
+          "IsVisible": 0,
+          "BandKind": 4,
+          "BandTop": 506,
+          "BandHeight": 100
+        },
+        {
+          "ClassName": "TBandArea",
+          "IsVisible": 1,
+          "BandKind": 5,
+          "BandTop": 506,
+          "BandHeight": 19
+        }
+      ]
+    }
+  ],
+  "StyleType": "",
+  "ExpressionFields": [],
+  "ReportKind": 0
+}

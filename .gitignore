@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# 虚拟环境
+.venv/
+
+# IDE
+.idea/
+
+# 环境变量（含云打印 Token，禁止提交）
+.env
+
+# 测试临时文件
+test_boundary.sh
