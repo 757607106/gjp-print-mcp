@@ -48,9 +48,11 @@ def _bearer_token_from_mcp_context(mcp_request_context: Any) -> str:
 
 
 def _report_name_from_mcp_context(mcp_request_context: Any) -> str:
-    """从 MCP HTTP 请求头读取 X-Report-Name（URL 解码）。
+    """从 MCP HTTP 请求头读取 X-Report-Name 并做标准 URL 解码。
 
-    HTTP 头不支持非 ASCII 字符，对接方需对 reportName 做 URL 编码。
+    HTTP 头不支持非 ASCII 字符，对接方需对 reportName 做一次 URL 编码
+    （标准做法），服务端用标准 unquote 解码一次还原原文。对接方多次
+    编码属于其实现问题，应在对应对接方修正，服务端不做循环解码。
     """
     request = getattr(mcp_request_context, "request", None)
     headers = getattr(request, "headers", None)

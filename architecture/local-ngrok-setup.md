@@ -122,6 +122,8 @@ https://jawline-certainly-jolliness.ngrok-free.dev
 | 库存盘点 | `%E5%BA%93%E5%AD%98%E7%9B%98%E7%82%B9` |
 | 付款单 | `%E4%BB%98%E6%AC%BE%E5%8D%95` |
 
+> `X-Report-Name` 必须用标准 URL 编码（UTF-8）且**只编码一次**；双重编码（如 `%25E6...`）会被服务端单次解码后仍是编码值，导致业务 API 收不到原文。编码规范详见 `saas-mcp-integration.md`。
+
 > 如果平台不支持在 Bearer Token 之外再添加自定义 Header，需在平台与
 > MCP 之间加一层鉴权网关，由网关注入 `Authorization` 和 `X-Report-Name`
 > 两个头。详见 `saas-mcp-integration.md` 的网关方案。

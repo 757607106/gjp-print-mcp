@@ -95,6 +95,18 @@ def test_report_name_from_mcp_context_strips_whitespace():
     )
 
 
+def test_report_name_decodes_single_url_encoded_header():
+    from urllib.parse import quote
+
+    encoded = quote("销售单")
+    assert (
+        _report_name_from_mcp_context(
+            _mcp_request("Bearer token", report_name=encoded)
+        )
+        == "销售单"
+    )
+
+
 # --- Bearer 头解析 ---
 
 
