@@ -55,6 +55,13 @@ def _validate_native_template(content: dict[str, Any]) -> None:
     云打印平台要求 styleContent 是包含 ReportName、Pages、BandAreas 等
     字段的原生模板结构。拒绝自定义格式（如 version/components/page），
     避免保存后平台无法渲染。
+
+    另一条硬约束：每个页面只能有一个 TTableElement 表格元素。图片中
+    看似独立的多个表格区域（标题、表头信息、明细、合计、页脚）必须组织
+    在同一个表格的 Rows 中，否则平台无法渲染。
+
+    第三条硬约束：模板必须包含至少一个字段绑定（@/#/^），不得把图片
+    中的数据值固化进 CellText；数据位置用绑定占位符，运行时由系统填充。
     """
     if "ReportName" not in content:
         raise DomainError(
@@ -86,6 +93,51 @@ def _validate_native_template(content: dict[str, Any]) -> None:
                 "STYLE_CONTENT_INVALID",
                 "Pages[%d] 缺少 BandAreas 数组" % index,
             )
+        report_elements = page.get("ReportElements")
+        if isinstance(report_elements, list):
+            table_count = sum(
+                1
+                for element in report_elements
+                if isinstance(element, dict)
+                and element.get("ClassName") == "TTableElement"
+            )
+            if table_count > 1:
+                raise DomainError(
+                    "STYLE_CONTENT_INVALID",
+                    "Pages[%d] 包含 %d 个 TTableElement 表格元素；云打印平台要求每个页面只能有一个表格，"
+                    "必须把标题、表头信息、明细、合计、页脚等所有内容组织在同一个表格的 Rows 中，"
+                    "通过设置无边框行（LeftLine/RightLine/TopLine/BottomLine=0）区分视觉区域，"
+                    "不要拆分成多个 TTableElement" % (index, table_count),
+                )
+
+    has_binding = False
+    has_table_rows = False
+    for page in pages:
+        if not isinstance(page, dict):
+            continue
+        for element in page.get("ReportElements") or []:
+            if not isinstance(element, dict):
+                continue
+            rows = element.get("Rows")
+            if not isinstance(rows, list) or not rows:
+                continue
+            has_table_rows = True
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                for cell in row.get("Cells") or []:
+                    if not isinstance(cell, dict):
+                        continue
+                    text = cell.get("CellText")
+                    if isinstance(text, str) and text[:1] in ("@", "#", "^"):
+                        has_binding = True
+    if has_table_rows and not has_binding:
+        raise DomainError(
+            "STYLE_CONTENT_INVALID",
+            "模板没有任何字段绑定（@/#/^），疑似把图片中的数据值固化进了模板；"
+            "数据位置必须用绑定占位符：表头/页脚值用 @字段名，明细用 #字段名，合计用 ^字段名，"
+            "不要写实际数据值（如公司名、金额、具体产品行）",
+        )
 
 
 class PrintToolSet(AgentScopeToolSet):

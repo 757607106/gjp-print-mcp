@@ -197,7 +197,11 @@ def create_mcp_server(
             context.request_id,
             elapsed_ms(started),
         )
-        return result
+        return types.CallToolResult(
+            content=[],
+            structuredContent=result if isinstance(result, dict) else None,
+            isError=not (isinstance(result, dict) and result.get("ok") is True),
+        )
 
     return server
 

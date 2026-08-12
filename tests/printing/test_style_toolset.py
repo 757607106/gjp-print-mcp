@@ -270,6 +270,59 @@ def test_save_style_rejects_page_without_bandareas():
     assert api.calls == []
 
 
+def test_save_style_rejects_multiple_tables_per_page():
+    """拒绝单页面包含多个 TTableElement 表格元素。"""
+    toolset, api = _toolset("print:read", "print:write")
+    template = _valid_template()
+    template["Pages"][0]["ReportElements"] = [
+        {"ClassName": "TTableElement", "Rows": []},
+        {"ClassName": "TTableElement", "Rows": []},
+    ]
+
+    result = toolset.save_style(1, "图片还原模板", "style-1", template)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "STYLE_CONTENT_INVALID"
+    assert "TTableElement" in result["error"]["message"]
+    assert api.calls == []
+
+
+def test_save_style_rejects_template_without_field_bindings():
+    """拒绝有表格行但无字段绑定（@/#/^）的模板，防止固化数据值。"""
+    toolset, api = _toolset("print:read", "print:write")
+    template = _valid_template()
+    template["Pages"][0]["ReportElements"] = [{
+        "ClassName": "TTableElement",
+        "Rows": [
+            {"Cells": [{"CellText": "报价单位：小简有限公司"}, {"CellText": "1"}]},
+        ],
+    }]
+
+    result = toolset.save_style(1, "报价单", "style-1", template)
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "STYLE_CONTENT_INVALID"
+    assert "字段绑定" in result["error"]["message"]
+    assert api.calls == []
+
+
+def test_save_style_accepts_template_with_field_bindings():
+    """有字段绑定（@/#/^）的模板通过校验。"""
+    toolset, api = _toolset("print:read", "print:write")
+    template = _valid_template()
+    template["Pages"][0]["ReportElements"] = [{
+        "ClassName": "TTableElement",
+        "Rows": [
+            {"Cells": [{"CellText": "公司全名"}, {"CellText": "@公司全名"}]},
+        ],
+    }]
+
+    result = toolset.save_style(1, "报价单", "style-1", template)
+
+    assert result["ok"] is True
+    assert api.calls != []
+
+
 def test_multi_turn_edit_restores_latest_template_and_reuses_style_id():
     toolset, _api = _toolset("print:read", "print:write")
     style_id = "2086707921336647680"
