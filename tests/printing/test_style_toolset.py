@@ -113,15 +113,15 @@ def _toolset(*scopes: str) -> tuple[PrintToolSet, FakePrintApi]:
 def test_style_tools_are_published_without_token_or_report_name():
     toolset, _ = _toolset("print:read", "print:write")
 
-    assert PRINT_MCP_TOOL_NAMES == {"get_print_info", "new_style", "save_style"}
+    assert PRINT_MCP_TOOL_NAMES == {"getPrintInfo", "newStyle", "saveStyle"}
     exported = {tool.name: tool for tool in toolset.executable_tools()}
-    for name in ("get_print_info", "new_style", "save_style"):
+    for name in ("getPrintInfo", "newStyle", "saveStyle"):
         schema_text = json.dumps(exported[name].input_schema).casefold()
         assert "token" not in schema_text
         assert "report_name" not in schema_text
 
-    assert set(exported["get_print_info"].input_schema["properties"]) == set()
-    assert set(exported["save_style"].input_schema["required"]) == {
+    assert set(exported["getPrintInfo"].input_schema["properties"]) == set()
+    assert set(exported["saveStyle"].input_schema["required"]) == {
         "report_type",
         "style_name",
         "style_id",
@@ -159,7 +159,7 @@ def test_new_style_returns_values_required_by_save_style():
 
     assert result == {
         "ok": True,
-        "message": "打印模板样式已创建，请继续调用 save_style 保存模板内容",
+        "message": "打印模板样式已创建，请继续调用 saveStyle 保存模板内容",
         "styleId": "2086707921336647680",
         "reportName": REPORT_NAME,
         "reportType": 1,

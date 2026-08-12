@@ -33,7 +33,6 @@ from starlette.routing import Route
 from .context import InvocationContext
 from .logging_config import (
     clip_log_text,
-    credential_dump_enabled,
     elapsed_ms,
     error_text,
 )
@@ -136,8 +135,8 @@ def create_mcp_server(
             _masked_authorization(request_context),
             clip_log_text(json.dumps(arguments, ensure_ascii=False)),
         )
-        if credential_dump_enabled() and logger.isEnabledFor(logging.DEBUG):
-            # 凭据原文仅在显式开启 GJP_DEBUG_DUMP_CREDENTIALS 时输出，生产不落盘
+        if logger.isEnabledFor(logging.DEBUG):
+            # DEBUG 级别输出含 token 的完整 MCP 请求头（Authorization、X-Report-Name）；生产请使用 INFO 级别，避免令牌落盘
             logger.debug(
                 "MCP 请求头 tool=%s headers=%s",
                 name,

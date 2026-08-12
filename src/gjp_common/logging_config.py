@@ -14,8 +14,6 @@ from .config import _read_local_env
 LOGGER_NAME = "gjp_common"
 # 统一挂载 handler 的包命名空间；只含本项目业务包，不接管第三方 SDK 的协议层日志
 PACKAGE_LOGGERS = ("gjp_common", "yunprint")
-# 凭据原文转储开关：独立于日志级别，仅本地调试开启
-CREDENTIAL_DUMP_ENV = "GJP_DEBUG_DUMP_CREDENTIALS"
 # 单条日志中业务参数与响应体的最大字符数，避免长文本淹没终端
 LOG_TEXT_LIMIT = 2000
 TRUE_VALUES = {"1", "true", "yes", "on", "enable", "enabled"}
@@ -49,31 +47,6 @@ def _enabled(value: str) -> bool:
     if normalized in TRUE_VALUES:
         return True
     return True
-
-
-def logging_runtime_settings() -> Dict[str, object]:
-    local_env = _read_local_env()
-    level_name = _setting(local_env, "GJP_LOG_LEVEL", "INFO").upper()
-    return {
-        "enabled": _enabled(_setting(local_env, "GJP_LOG_ENABLED", "true")),
-        "level": level_name if level_name in LEVELS else "INFO",
-        "contextEnabled": _enabled(_setting(local_env, "GJP_LOG_CONTEXT", "false")),
-        "credentialDumpEnabled": credential_dump_enabled(),
-    }
-
-
-def context_logging_enabled() -> bool:
-    return _CONTEXT_LOGGING_ENABLED
-
-
-def credential_dump_enabled() -> bool:
-    """是否允许在 DEBUG 日志中输出凭据原文（Authorization、Cookie）。
-
-    与日志级别完全独立且默认关闭：生产即使整体跑 DEBUG，只要不显式开启本开关
-    就不会把访问令牌写进日志。仅接受明确的真值，未识别的取值一律视为关闭。
-    """
-    local_env = _read_local_env()
-    return _setting(local_env, CREDENTIAL_DUMP_ENV, "false").lower() in TRUE_VALUES
 
 
 def clip_log_text(text: str) -> str:

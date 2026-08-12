@@ -128,14 +128,3 @@ def test_save_style_serializes_template_and_disables_retries(monkeypatch: pytest
         "baseStyleContent": "",
         "isPublic": False,
     }
-
-
-def test_debug_payload_redacts_token_and_template_content():
-    safe = YunPrintRepository._safe_log_payload(
-        {"token": "secret-token", "styleContent": "{\"Pages\":[]}"}
-    )
-
-    assert safe == {
-        "token": "<redacted>",
-        "styleContent": "<omitted:12 chars>",
-    }

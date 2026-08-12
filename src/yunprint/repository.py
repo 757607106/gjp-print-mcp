@@ -11,6 +11,10 @@ import urllib.request
 from typing import Any
 
 from gjp_common.errors import DomainError
+from gjp_common.logging_config import (
+    clip_log_text,
+    elapsed_ms,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -26,17 +30,6 @@ class YunPrintRepository:
         if not self.base_url.startswith("https://"):
             raise DomainError("YUNPRINT_CONFIG_INVALID", "云打印地址必须使用 HTTPS")
 
-    @staticmethod
-    def _safe_log_payload(payload: dict[str, Any]) -> dict[str, Any]:
-        """构造不含令牌、完整模板内容的调试日志请求体。"""
-        safe_payload = dict(payload)
-        if "token" in safe_payload:
-            safe_payload["token"] = "<redacted>"
-        style_content = safe_payload.get("styleContent")
-        if isinstance(style_content, str):
-            safe_payload["styleContent"] = "<omitted:%d chars>" % len(style_content)
-        return safe_payload
-
     def _post_result(
         self,
         path: str,
@@ -45,17 +38,22 @@ class YunPrintRepository:
         allow_retries: bool = True,
     ) -> Any:
         started = time.perf_counter()
+        url = self.base_url + "/" + path.lstrip("/")
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
         logger.info("云打印接口请求开始 api=%s", path)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(
-                "云打印接口请求体 api=%s payload=%s",
-                path,
-                json.dumps(self._safe_log_payload(payload), ensure_ascii=False),
+                "云打印接口请求 method=POST url=%s headers=%s body=%s",
+                url,
+                json.dumps(headers, ensure_ascii=False),
+                clip_log_text(
+                    json.dumps(payload, ensure_ascii=False),
+                ),
             )
         request = urllib.request.Request(
-            self.base_url + "/" + path.lstrip("/"),
+            url,
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers=headers,
             method="POST",
         )
         max_attempts = self.max_retries if allow_retries else 1
@@ -110,18 +108,15 @@ class YunPrintRepository:
                 str(result.get("message") or "云打印接口失败"),
             )
         logger.info(
-            "云打印接口请求完成 api=%s duration_ms=%d",
+            "云打印接口请求完成 api=%s elapsed=%dms",
             path,
-            int((time.perf_counter() - started) * 1000),
+            elapsed_ms(started),
         )
         if logger.isEnabledFor(logging.DEBUG):
-            data = result.get("data")
             logger.debug(
-                "云打印接口响应体 api=%s data=%s",
-                path,
-                json.dumps(data, ensure_ascii=False)[:2000]
-                if data is not None
-                else "null",
+                "云打印接口响应 url=%s body=%s",
+                url,
+                clip_log_text(json.dumps(body, ensure_ascii=False)),
             )
         return result.get("data")
 

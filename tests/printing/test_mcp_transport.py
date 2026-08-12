@@ -53,4 +53,4 @@ def test_streamable_http_issues_session_and_only_lists_three_tools(monkeypatch):
 
     assert response.status_code == 200
     tool_names = {tool["name"] for tool in response.json()["result"]["tools"]}
-    assert tool_names == {"get_print_info", "new_style", "save_style"}
+    assert tool_names == {"getPrintInfo", "newStyle", "saveStyle"}

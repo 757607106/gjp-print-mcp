@@ -14,11 +14,13 @@ from .ports import PrintApiPort
 from .repository import YunPrintRepository
 
 
+# 对外 MCP 工具名用 camelCase，与系统提示词及 AGENTS.md 对外命名约定一致；
+# Python 方法名仍为 snake_case，仅供内部调用，通过 FunctionTool(name=) 显式覆盖对外名。
 PRINT_MCP_TOOL_NAMES = frozenset(
     {
-        "get_print_info",
-        "new_style",
-        "save_style",
+        "getPrintInfo",
+        "newStyle",
+        "saveStyle",
     },
 )
 
@@ -158,9 +160,21 @@ class PrintToolSet(AgentScopeToolSet):
         self._report_name_resolver = report_name_resolver or (lambda _ctx: "")
         super().__init__(
             [
-                BusinessFunctionTool(self.get_print_info, is_read_only=True),
-                BusinessFunctionTool(self.new_style, is_concurrency_safe=False),
-                BusinessFunctionTool(self.save_style, is_concurrency_safe=False),
+                BusinessFunctionTool(
+                    self.get_print_info,
+                    name="getPrintInfo",
+                    is_read_only=True,
+                ),
+                BusinessFunctionTool(
+                    self.new_style,
+                    name="newStyle",
+                    is_concurrency_safe=False,
+                ),
+                BusinessFunctionTool(
+                    self.save_style,
+                    name="saveStyle",
+                    is_concurrency_safe=False,
+                ),
             ],
             contexts=contexts,
             agent_tool_names=PRINT_MCP_TOOL_NAMES,
@@ -233,7 +247,7 @@ class PrintToolSet(AgentScopeToolSet):
                 style_id=style_id,
             )
             return self.ok_response(
-                message="打印模板样式已创建，请继续调用 save_style 保存模板内容",
+                message="打印模板样式已创建，请继续调用 saveStyle 保存模板内容",
                 styleId=style_id,
                 reportName=created_report_name,
                 reportType=created_report_type,

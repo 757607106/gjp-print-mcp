@@ -1,6 +1,6 @@
 # GJP Agent
 
-基于 AgentScope 2.0.4 的云打印模板样式 MCP 服务。对外只发布 GetPrintInfo、NewStyle、SaveStyle 三项能力，同时保留内部模板 JSON 生成内核。
+基于 AgentScope 2.0.4 的云打印模板样式 MCP 服务。对外只发布 GetPrintInfo、NewStyle、SaveStyle 三项能力。
 
 ## 产品与服务边界
 
@@ -40,11 +40,11 @@ MCP 只发布 `get_print_info`、`new_style`、`save_style`。视觉模型识别
 
 ```
 src/
-├── yunprint/                  # 打印服务包：App、ToolSet、Port、Adapter、Prompt、MCP、领域代码
+├── yunprint/                  # 打印服务包：App、ToolSet、Port、Adapter、Prompt、MCP
 └── gjp_common/                # 业务无关公共层：上下文、连接、MCP、配置、路径、日志
 ```
 
-`ToolSet` 是 Agent 与 MCP 的唯一工具来源。`create_print_mcp_service` 有 `isinstance` 类型守卫，确保只发布 `PrintToolSet`。`catalog / planner / native / service` 等模块是内部模板 JSON 生成能力，不额外注册 MCP 工具。`TemplateConversationStore` 仅保存三个工具间的当前模板 JSON 和修订号，不定义工具。
+`ToolSet` 是 Agent 与 MCP 的唯一工具来源。`create_print_mcp_service` 有 `isinstance` 类型守卫，确保只发布 `PrintToolSet`。`TemplateConversationStore` 仅保存三个工具间的当前模板 JSON 和修订号，不定义工具。
 
 ## 开发规范
 

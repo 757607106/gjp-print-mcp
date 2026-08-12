@@ -16,6 +16,7 @@ base_url 部署级固定（YUNPRINT_BASE_URL）。
 from __future__ import annotations
 
 import hashlib
+import logging
 import threading
 from urllib.parse import unquote
 from typing import Any, Callable
@@ -29,6 +30,8 @@ from gjp_common.logging_config import configure_logging
 from .adapters import UnavailablePrintApi, YunPrintAccessTokenAdapter
 from .mcp_service import create_print_mcp_service
 from .toolset import PrintToolSet
+
+logger = logging.getLogger(__name__)
 
 
 def _bearer_token_from_mcp_context(mcp_request_context: Any) -> str:
@@ -138,6 +141,12 @@ class OpaqueTokenIdentityResolver:
         context = _context_from_token(token, _mcp_session_hint(mcp_request_context))
         context.require_scope("print:read")
         self._store.register(context, token, report_name)
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "MCP 身份解析注入 reportName=%s token=%s",
+                report_name or "<空>",
+                token,
+            )
         return context
 
 
