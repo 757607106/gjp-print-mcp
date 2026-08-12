@@ -196,9 +196,19 @@ def create_mcp_server(
             context.request_id,
             elapsed_ms(started),
         )
+        # MCP 2025-06-18 规范要求 structuredContent 与 content 同时提供：
+        # content 放等价 JSON 文本，structuredContent 放结构化对象
+        structured = result if isinstance(result, dict) else None
         return types.CallToolResult(
-            content=[],
-            structuredContent=result if isinstance(result, dict) else None,
+            content=[
+                types.TextContent(
+                    type="text",
+                    text=json.dumps(structured, ensure_ascii=False),
+                )
+            ]
+            if structured is not None
+            else [],
+            structuredContent=structured,
             isError=not (isinstance(result, dict) and result.get("ok") is True),
         )
 
