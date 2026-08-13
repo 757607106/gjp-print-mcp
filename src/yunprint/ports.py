@@ -8,9 +8,9 @@ from gjp_common.context import InvocationContext
 
 
 class PrintApiPort(Protocol):
-    """获取、新建和保存模板样式的已鉴权 API 端口。"""
+    """获取、新建和保存模板样式的已鉴权异步 API 端口。"""
 
-    def get_print_info(
+    async def get_print_info(
         self,
         context: InvocationContext,
         report_name: str,
@@ -18,7 +18,7 @@ class PrintApiPort(Protocol):
     ) -> dict[str, Any]:
         ...
 
-    def new_style(
+    async def new_style(
         self,
         context: InvocationContext,
         report_name: str,
@@ -27,7 +27,7 @@ class PrintApiPort(Protocol):
     ) -> dict[str, Any]:
         ...
 
-    def save_style(
+    async def save_style(
         self,
         context: InvocationContext,
         report_name: str,

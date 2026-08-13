@@ -31,6 +31,7 @@ from starlette.routing import BaseRoute
 from starlette.routing import Route
 
 from .context import InvocationContext
+from .errors import DomainError
 from .logging_config import (
     clip_log_text,
     elapsed_ms,
@@ -174,8 +175,31 @@ def create_mcp_server(
             raise ValueError("运行时工具 schema 与 MCP 发布版本不一致：%s" % name)
         with runtime_toolset.bind_context(context):
             try:
-                result = await _invoke_tool(
-                    tool, arguments, tenant_id=context.tenant_id
+                text, payload = await _invoke_tool(
+                    tool, arguments, tenant_id=context.tenant_id,
+                )
+            except DomainError as exc:
+                logger.warning(
+                    "MCP 调用业务失败 tool=%s tenant=%s session=%s elapsed=%dms error=%s",
+                    name,
+                    context.tenant_id,
+                    context.session_id,
+                    elapsed_ms(started),
+                    error_text(exc),
+                )
+                error_payload = {
+                    "ok": False,
+                    "error": {"code": exc.code, "message": exc.message},
+                }
+                return types.CallToolResult(
+                    content=[
+                        types.TextContent(
+                            type="text",
+                            text=json.dumps(error_payload, ensure_ascii=False),
+                        ),
+                    ],
+                    structuredContent=error_payload,
+                    isError=True,
                 )
             except Exception as exc:
                 logger.warning(
@@ -197,19 +221,16 @@ def create_mcp_server(
             elapsed_ms(started),
         )
         # MCP 2025-06-18 规范要求 structuredContent 与 content 同时提供：
-        # content 放等价 JSON 文本，structuredContent 放结构化对象
-        structured = result if isinstance(result, dict) else None
+        # content 放等价 JSON 文本，structuredContent 放结构化对象。
+        # _invoke_tool 已返回 JSON 文本，直接复用避免重复 json.dumps。
         return types.CallToolResult(
             content=[
-                types.TextContent(
-                    type="text",
-                    text=json.dumps(structured, ensure_ascii=False),
-                )
+                types.TextContent(type="text", text=text),
             ]
-            if structured is not None
+            if payload is not None
             else [],
-            structuredContent=structured,
-            isError=not (isinstance(result, dict) and result.get("ok") is True),
+            structuredContent=payload,
+            isError=not (isinstance(payload, dict) and payload.get("ok") is True),
         )
 
     return server
@@ -243,8 +264,14 @@ async def _invoke_tool(
     arguments: dict[str, Any],
     *,
     tenant_id: str = "",
-) -> dict[str, Any]:
-    """执行 AgentScope 工具并把文本 JSON 还原为 MCP structuredContent。"""
+) -> tuple[str, dict[str, Any]]:
+    """执行 AgentScope 工具，返回 (JSON 文本, 结构化 payload)。
+
+    显式调用 check_permissions 以在 MCP 服务端激活框架权限检查；
+    返回 text 避免上层重复 json.dumps。
+    """
+    # 框架的 __call__ 不会在 MCP 服务端自动调用 check_permissions，需显式触发
+    await tool.check_permissions(arguments, None)  # type: ignore[arg-type]
     result = await tool(**arguments)
     chunks: list[ToolChunk] = []
     if isinstance(result, AsyncGenerator):
@@ -260,7 +287,7 @@ async def _invoke_tool(
     ]
     text = "".join(texts).strip()
     if not text:
-        return {"ok": True}
+        return "", {"ok": True}
     if len(text.encode("utf-8")) > _TOOL_RESULT_WARN_BYTES:
         logger.warning(
             "MCP 结果较大 tool=%s tenant=%s size=%dKB，可能影响模型上下文",
@@ -271,8 +298,10 @@ async def _invoke_tool(
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
-        return {"ok": True, "result": text}
-    return payload if isinstance(payload, dict) else {"ok": True, "result": payload}
+        return text, {"ok": True, "result": text}
+    if isinstance(payload, dict):
+        return text, payload
+    return text, {"ok": True, "result": payload}
 
 
 async def run_stdio_server(server: Server) -> None:

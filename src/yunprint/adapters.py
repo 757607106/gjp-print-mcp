@@ -1,4 +1,4 @@
-"""三个云打印模板样式 API 的动态 Token Adapter。"""
+"""三个云打印模板样式 API 的动态 Token 异步 Adapter。"""
 
 from __future__ import annotations
 
@@ -38,16 +38,16 @@ class YunPrintAccessTokenAdapter:
             raise DomainError("PRINT_API_UNAUTHORIZED", "当前打印会话的鉴权类型无效")
         return self._repository_factory(connection.base_url), connection.credential.value
 
-    def get_print_info(
+    async def get_print_info(
         self,
         context: InvocationContext,
         report_name: str,
         report_type: int,
     ) -> dict[str, Any]:
         repository, token = self._client(context)
-        return repository.get_print_info(token, report_name, report_type)
+        return await repository.get_print_info(token, report_name, report_type)
 
-    def new_style(
+    async def new_style(
         self,
         context: InvocationContext,
         report_name: str,
@@ -55,9 +55,9 @@ class YunPrintAccessTokenAdapter:
         style_name: str,
     ) -> dict[str, Any]:
         repository, token = self._client(context)
-        return repository.new_style(token, report_name, report_type, style_name)
+        return await repository.new_style(token, report_name, report_type, style_name)
 
-    def save_style(
+    async def save_style(
         self,
         context: InvocationContext,
         report_name: str,
@@ -67,7 +67,7 @@ class YunPrintAccessTokenAdapter:
         style_content: dict[str, Any],
     ) -> Any:
         repository, token = self._client(context)
-        return repository.save_style(
+        return await repository.save_style(
             token,
             report_name,
             report_type,
@@ -84,7 +84,7 @@ class UnavailablePrintApi:
     def _raise() -> None:
         raise DomainError("PRINT_API_NOT_CONFIGURED", "打印服务尚未注入已鉴权 PrintApiPort")
 
-    def get_print_info(
+    async def get_print_info(
         self,
         context: InvocationContext,
         report_name: str,
@@ -92,7 +92,7 @@ class UnavailablePrintApi:
     ) -> dict[str, Any]:
         self._raise()
 
-    def new_style(
+    async def new_style(
         self,
         context: InvocationContext,
         report_name: str,
@@ -101,7 +101,7 @@ class UnavailablePrintApi:
     ) -> dict[str, Any]:
         self._raise()
 
-    def save_style(
+    async def save_style(
         self,
         context: InvocationContext,
         report_name: str,

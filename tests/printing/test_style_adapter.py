@@ -26,16 +26,16 @@ class RecordingRepository:
     def __init__(self) -> None:
         self.calls: list[tuple] = []
 
-    def new_style(self, *args):
+    async def new_style(self, *args):
         self.calls.append(("new_style", *args))
         return {"id": "style-1"}
 
-    def save_style(self, *args):
+    async def save_style(self, *args):
         self.calls.append(("save_style", *args))
         return None
 
 
-def test_adapter_injects_current_connection_token_into_style_writes():
+async def test_adapter_injects_current_connection_token_into_style_writes():
     repository = RecordingRepository()
     adapter = YunPrintAccessTokenAdapter(
         StaticConnectionProvider(),
@@ -48,8 +48,8 @@ def test_adapter_injects_current_connection_token_into_style_writes():
     )
     template = {"ReportName": "销售单", "Pages": []}
 
-    adapter.new_style(context, "销售单", 1, "图片还原模板")
-    adapter.save_style(context, "销售单", 1, "图片还原模板", "style-1", template)
+    await adapter.new_style(context, "销售单", 1, "图片还原模板")
+    await adapter.save_style(context, "销售单", 1, "图片还原模板", "style-1", template)
 
     assert repository.calls == [
         (

@@ -57,9 +57,9 @@ uv run python -m yunprint --host 127.0.0.1 --port 8931
 uv run uvicorn yunprint.app:app --host 0.0.0.0 --port 8931 --workers 1
 ```
 
-当前 `TemplateConversationStore` 是进程内存实现，启动命令必须保持
-`--workers 1`。多 worker、多容器或滚动重启部署前，需先改为 Redis/数据库
-共享状态。
+当前 `BearerConnectionStore` 和 `TemplateConversationStore` 是进程内存实现（TTL
+自动清理，默认 2 小时），启动命令必须保持 `--workers 1`。多 worker、多容器或
+滚动重启部署前，需先改为 Redis/数据库共享状态。
 
 ## MCP 客户端配置
 
@@ -164,13 +164,13 @@ Token。
 ```text
 账号A
   → 凭据库取得 Token-A
-  → 建立 MCP 会话A，Authorization: Bearer Token-A
-  → get_print_info(report_name=账号A当前分类)
+  → 建立 MCP 会话A，Authorization: Bearer Token-A, X-Report-Name: <账号A分类>
+  → getPrintInfo()
 
 账号B
   → 凭据库取得 Token-B
-  → 建立 MCP 会话B，Authorization: Bearer Token-B
-  → get_print_info(report_name=账号B当前分类)
+  → 建立 MCP 会话B，Authorization: Bearer Token-B, X-Report-Name: <账号B分类>
+  → getPrintInfo()
 ```
 
 调用规则：
@@ -179,7 +179,7 @@ Token。
    账号的云打印 Token。
 2. 使用该 Token 建立账号专属 MCP 连接，或在该账号的每个 MCP HTTP 请求中
    动态设置 `Authorization: Bearer <Token>`。
-3. 图片识别出的分类名称作为 `get_print_info.arguments.report_name` 传入。
+3. 图片识别出的分类名称作为 `X-Report-Name` 请求头传入，不进入工具参数。
 4. 账号切换时必须新建 MCP 会话，不得沿用上一个账号的
    `Mcp-Session-Id`。
 5. 一个账号的多轮模板修改应继续使用该账号的原 MCP 会话。
@@ -221,7 +221,7 @@ Streamable HTTP 初始化成功后，服务端在响应头中返回
 - 客户端不支持会话头时，服务端退化为按 Token 哈希隔离，同 Token 的多个对话
   可能共享当前模板。
 
-`get_print_info` 除远端 GetPrintInfo 数据外，还返回当前会话的
+`getPrintInfo` 除远端 GetPrintInfo 数据外，还返回当前会话的
 `currentStyle`。Agent 每轮修改前读取其中的完整 `styleContent`，修改后使用
 相同 `styleId` 保存。
 
@@ -276,9 +276,9 @@ curl -sS -X POST 'http://127.0.0.1:8931/mcp' \
 
 返回工具名必须且只能是：
 
-1. `get_print_info`
-2. `new_style`
-3. `save_style`
+1. `getPrintInfo`
+2. `newStyle`
+3. `saveStyle`
 
 ## 反向代理要求
 
@@ -296,13 +296,13 @@ curl -sS -X POST 'http://127.0.0.1:8931/mcp' \
 `Mcp-Session-Id` 共同派生内部 `session_id`。原始 Token 仅保存在服务端连接
 存储中，实际有效性由云打印 API 校验。
 
-SaaS Agent 只会发现 `get_print_info`、`new_style` 和 `save_style`。工具参数
+SaaS Agent 只会发现 `getPrintInfo`、`newStyle` 和 `saveStyle`。工具参数
 中不存在 Token、账号、密码、Cookie、业务地址或任意 URL。
 
 ## 失败恢复
 
-`new_style` 不自动重试，避免网络结果不明确时产生重复模板。`save_style`
-失败后应复用已经返回的 `styleId` 重试保存，不得再次调用 `new_style`。
+`newStyle` 不自动重试，避免网络结果不明确时产生重复模板。`saveStyle`
+失败后应复用已经返回的 `styleId` 重试保存，不得再次调用 `newStyle`。
 
 ## 常见错误
 

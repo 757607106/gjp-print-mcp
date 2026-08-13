@@ -9,6 +9,7 @@ description = "AgentScope MCP service for GJP cloud printing"
 requires-python = ">=3.11"
 dependencies = [
   "agentscope>=2.0.4.post1,<2.1",
+  "httpx>=0.28,<1",
   "mcp>=1.28,<2",
   "pydantic>=2.12,<3",
   "starlette>=0.27,<1",
@@ -16,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["httpx>=0.28,<1", "pytest>=9,<10"]
+dev = ["pytest>=9,<10", "pytest-asyncio>=1.0,<2"]
 
 [tool.uv.build-backend]
 module-name = ["yunprint", "gjp_common"]
@@ -25,3 +26,4 @@ module-name = ["yunprint", "gjp_common"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
+asyncio_mode = "auto"

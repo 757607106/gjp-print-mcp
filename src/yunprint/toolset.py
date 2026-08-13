@@ -142,6 +142,62 @@ def _validate_native_template(content: dict[str, Any]) -> None:
         )
 
 
+# --- 工具 input_schema（精确约束，减少 LLM 无效调用） ---
+
+_GET_PRINT_INFO_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {},
+    "required": [],
+}
+
+_NEW_STYLE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "report_type": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "报表类型，例如 1。",
+        },
+        "style_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "新增模板名称。",
+        },
+    },
+    "required": ["report_type", "style_name"],
+}
+
+_SAVE_STYLE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "report_type": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "newStyle 返回的报表类型。",
+        },
+        "style_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "newStyle 返回的模板名称。",
+        },
+        "style_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "newStyle 返回的模板 ID。",
+        },
+        "style_content": {
+            "type": "object",
+            "minProperties": 1,
+            "description": (
+                "云打印原生模板 JSON 对象，必须包含 ReportName、PageSetting、"
+                "Pages、BandAreas 等顶层字段。禁止 version/components 等自定义格式。"
+            ),
+        },
+    },
+    "required": ["report_type", "style_name", "style_id", "style_content"],
+}
+
+
 class PrintToolSet(AgentScopeToolSet):
     """只发布获取、新建和保存模板样式三个工具。
 
@@ -164,16 +220,25 @@ class PrintToolSet(AgentScopeToolSet):
                     self.get_print_info,
                     name="getPrintInfo",
                     is_read_only=True,
+                    input_schema=_GET_PRINT_INFO_SCHEMA,
+                    contexts=contexts,
+                    required_scope="print:read",
                 ),
                 BusinessFunctionTool(
                     self.new_style,
                     name="newStyle",
                     is_concurrency_safe=False,
+                    input_schema=_NEW_STYLE_SCHEMA,
+                    contexts=contexts,
+                    required_scope="print:write",
                 ),
                 BusinessFunctionTool(
                     self.save_style,
                     name="saveStyle",
                     is_concurrency_safe=False,
+                    input_schema=_SAVE_STYLE_SCHEMA,
+                    contexts=contexts,
+                    required_scope="print:write",
                 ),
             ],
             contexts=contexts,
@@ -186,7 +251,7 @@ class PrintToolSet(AgentScopeToolSet):
         context = self._contexts.get()
         return _required_text(self._report_name_resolver(context), "report_name")
 
-    def get_print_info(self) -> dict[str, Any]:
+    async def get_print_info(self) -> dict[str, Any]:
         """获取当前分类（reportType 固定为 1）下已有的打印模板样式。
 
         reportName 由 MCP 请求头 X-Report-Name 动态注入，Token 由
@@ -199,7 +264,7 @@ class PrintToolSet(AgentScopeToolSet):
             report_name = self._resolve_report_name()
             context = self._contexts.get()
             context.require_scope("print:read")
-            print_info = self._api.get_print_info(context, report_name, 1)
+            print_info = await self._api.get_print_info(context, report_name, 1)
             return self.ok_response(
                 reportName=report_name,
                 reportType=1,
@@ -210,7 +275,7 @@ class PrintToolSet(AgentScopeToolSet):
         except DomainError as exc:
             return self.error_response(exc)
 
-    def new_style(
+    async def new_style(
         self,
         report_type: int | str,
         style_name: str,
@@ -229,7 +294,7 @@ class PrintToolSet(AgentScopeToolSet):
             style_name = _required_text(style_name, "style_name")
             context = self._contexts.get()
             context.require_scope("print:write")
-            created = self._api.new_style(
+            created = await self._api.new_style(
                 context,
                 report_name,
                 report_type,
@@ -258,10 +323,10 @@ class PrintToolSet(AgentScopeToolSet):
             if isinstance(exc, DomainError):
                 return self.error_response(exc)
             return self.error_response(
-                DomainError("YUNPRINT_RESPONSE_INVALID", "新增样式返回的 reportType 无效"),
+                DomainError("YUNPRINT_RESPONSE_INVALID", "新增样式返回数据格式无效：%s" % exc),
             )
 
-    def save_style(
+    async def save_style(
         self,
         report_type: int | str,
         style_name: str,
@@ -291,7 +356,7 @@ class PrintToolSet(AgentScopeToolSet):
             _validate_native_template(style_content)
             context = self._contexts.get()
             context.require_scope("print:write")
-            api_result = self._api.save_style(
+            api_result = await self._api.save_style(
                 context,
                 report_name,
                 report_type,

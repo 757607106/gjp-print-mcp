@@ -54,8 +54,8 @@ Authorization: Bearer <token>
 领域代码，不改变对外 MCP 只发布三个工具的边界。
 
 MCP 不写本地文件。`TemplateConversationStore` 在进程内保存每个认证会话、每个
-报表分类最新的完整模板 JSON；最终 JSON 仍通过 `save_style.style_content` 写入
-云打印业务系统。
+报表分类最新的完整模板 JSON；通过 TTL 自动清理过期会话（默认 2 小时），避免
+内存无限增长。最终 JSON 仍通过 `saveStyle.style_content` 写入云打印业务系统。
 
 ## 多轮修改
 
@@ -68,5 +68,7 @@ MCP 不写本地文件。`TemplateConversationStore` 在进程内保存每个认
 ```
 
 不同 `tenant_id / account_id / session_id / report_name` 的状态相互隔离。参考存储
-不保留历史版本，仅保留最新 JSON。`session_id` 优先由 Token 与标准
-`Mcp-Session-Id` 共同派生，避免同一 Token 的并行对话互相覆盖。
+不保留历史版本，仅保留最新 JSON。`BearerConnectionStore` 和
+`TemplateConversationStore` 均通过 TTL 自动清理过期会话（默认 2 小时）。
+`session_id` 优先由 Token 与标准 `Mcp-Session-Id` 共同派生，避免同一 Token 的
+并行对话互相覆盖。

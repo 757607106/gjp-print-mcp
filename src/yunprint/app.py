@@ -15,9 +15,11 @@ base_url 部署级固定（YUNPRINT_BASE_URL）。
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import threading
+import time
 from urllib.parse import unquote
 from typing import Any, Callable
 
@@ -26,8 +28,9 @@ from gjp_common.connections import BusinessApiCredential, TenantApiConnection
 from gjp_common.context import InvocationContext, InvocationContextStore
 from gjp_common.errors import DomainError
 from gjp_common.logging_config import configure_logging
+from gjp_common.mcp import StaticToolSetResolver
 
-from .adapters import UnavailablePrintApi, YunPrintAccessTokenAdapter
+from .adapters import YunPrintAccessTokenAdapter
 from .mcp_service import create_print_mcp_service
 from .toolset import PrintToolSet
 
@@ -85,16 +88,49 @@ class BearerConnectionStore:
 
     Bearer 和 reportName 只存在于服务端内存，不进入 InvocationContext、Tool
     Schema 或模型上下文；单进程装配使用，多副本部署应替换为共享会话存储。
+    通过 TTL 自动清理过期会话，避免内存无限增长。
     """
 
-    def __init__(self) -> None:
+    _DEFAULT_TTL_SECONDS = 7200
+
+    def __init__(self, ttl_seconds: float = _DEFAULT_TTL_SECONDS) -> None:
         self._lock = threading.Lock()
         self._bearers: dict[tuple[str, str, str], str] = {}
         self._report_names: dict[tuple[str, str, str], str] = {}
+        self._timestamps: dict[tuple[str, str, str], float] = {}
+        self._ttl_seconds = ttl_seconds
 
     @staticmethod
     def _key(context: InvocationContext) -> tuple[str, str, str]:
         return (context.tenant_id, context.account_id, context.session_id)
+
+    def _cleanup_locked(self) -> None:
+        """清理过期条目，必须在持有锁时调用。"""
+        if self._ttl_seconds <= 0:
+            return
+        now = time.monotonic()
+        expired = [
+            key for key, ts in self._timestamps.items()
+            if now - ts > self._ttl_seconds
+        ]
+        for key in expired:
+            self._bearers.pop(key, None)
+            self._report_names.pop(key, None)
+            self._timestamps.pop(key, None)
+
+    def _touch_locked(self, key: tuple[str, str, str]) -> None:
+        """记录或更新条目的最后访问时间。"""
+        self._timestamps[key] = time.monotonic()
+
+    def _check_expired_locked(self, key: tuple[str, str, str]) -> None:
+        """检查单个条目是否过期，过期则删除。"""
+        if self._ttl_seconds <= 0:
+            return
+        ts = self._timestamps.get(key)
+        if ts is not None and time.monotonic() - ts > self._ttl_seconds:
+            self._bearers.pop(key, None)
+            self._report_names.pop(key, None)
+            self._timestamps.pop(key, None)
 
     def register(
         self,
@@ -103,13 +139,20 @@ class BearerConnectionStore:
         report_name: str = "",
     ) -> None:
         with self._lock:
-            self._bearers[self._key(context)] = bearer
+            key = self._key(context)
+            self._bearers[key] = bearer
             if report_name:
-                self._report_names[self._key(context)] = report_name
+                self._report_names[key] = report_name
+            self._touch_locked(key)
+            self._cleanup_locked()
 
     def resolve(self, context: InvocationContext) -> TenantApiConnection:
         with self._lock:
-            bearer = self._bearers.get(self._key(context), "")
+            key = self._key(context)
+            self._check_expired_locked(key)
+            bearer = self._bearers.get(key, "")
+            if bearer:
+                self._touch_locked(key)
         if not bearer:
             raise DomainError("BUSINESS_CREDENTIAL_REQUIRED", "当前会话缺少云打印 Bearer")
         base_url = get_env_value("YUNPRINT_BASE_URL").strip()
@@ -124,7 +167,9 @@ class BearerConnectionStore:
     def get_report_name(self, context: InvocationContext) -> str:
         """返回当前会话的 reportName，由 MCP 请求头注入。"""
         with self._lock:
-            return self._report_names.get(self._key(context), "")
+            key = self._key(context)
+            self._check_expired_locked(key)
+            return self._report_names.get(key, "")
 
 
 class OpaqueTokenIdentityResolver:
@@ -152,38 +197,19 @@ class OpaqueTokenIdentityResolver:
         return context
 
 
-class PrintToolSetResolver:
-    """返回共享多轮编辑状态的三个模板样式工具。"""
-
-    def __init__(
-        self,
-        store: BearerConnectionStore,
-        *,
-        timeout_seconds: float = 30,
-    ) -> None:
-        self._toolset = PrintToolSet(
-            api=YunPrintAccessTokenAdapter(
-                connection_provider=store,
-                timeout_seconds=timeout_seconds,
-            ),
-            contexts=InvocationContextStore(),
-            report_name_resolver=store.get_report_name,
-        )
-
-    def resolve(self, _context: InvocationContext) -> PrintToolSet:
-        return self._toolset
-
-
 class _LazyPrintApp:
     """让 uvicorn 导入模块时不立即读取部署配置。"""
 
     def __init__(self, factory: Callable[[], Any]) -> None:
         self._factory = factory
         self._app: Any | None = None
+        self._lock = asyncio.Lock()
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
         if self._app is None:
-            self._app = self._factory()
+            async with self._lock:
+                if self._app is None:
+                    self._app = self._factory()
         await self._app(scope, receive, send)
 
 
@@ -195,17 +221,18 @@ def create_print_app() -> Any:
         raise DomainError("BUSINESS_CONNECTION_INVALID", "超时时间必须大于 0")
 
     store = BearerConnectionStore()
-    schema_toolset = PrintToolSet(
-        api=UnavailablePrintApi(),
-        contexts=InvocationContextStore(),
-    )
-    return create_print_mcp_service(
-        schema_toolset=schema_toolset,
-        identity_resolver=OpaqueTokenIdentityResolver(store),
-        toolset_resolver=PrintToolSetResolver(
-            store,
+    toolset = PrintToolSet(
+        api=YunPrintAccessTokenAdapter(
+            connection_provider=store,
             timeout_seconds=timeout_seconds,
         ),
+        contexts=InvocationContextStore(),
+        report_name_resolver=store.get_report_name,
+    )
+    return create_print_mcp_service(
+        schema_toolset=toolset,
+        identity_resolver=OpaqueTokenIdentityResolver(store),
+        toolset_resolver=StaticToolSetResolver(toolset),
     )
 
 

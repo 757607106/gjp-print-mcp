@@ -40,7 +40,7 @@ class FakePrintApi:
     def __init__(self) -> None:
         self.calls: list[tuple[Any, ...]] = []
 
-    def get_print_info(self, context, report_name: str, report_type: int) -> dict:
+    async def get_print_info(self, context, report_name: str, report_type: int) -> dict:
         self.calls.append(("get_print_info", context, report_name, report_type))
         return {
             "styleInfo": {
@@ -54,7 +54,7 @@ class FakePrintApi:
             }
         }
 
-    def new_style(
+    async def new_style(
         self,
         context,
         report_name: str,
@@ -69,7 +69,7 @@ class FakePrintApi:
             "styleName": style_name,
         }
 
-    def save_style(
+    async def save_style(
         self,
         context,
         report_name: str,
@@ -129,10 +129,10 @@ def test_style_tools_are_published_without_token_or_report_name():
     }
 
 
-def test_get_print_info_uses_header_report_name():
+async def test_get_print_info_uses_header_report_name():
     toolset, api = _toolset("print:read", "print:write")
 
-    result = toolset.get_print_info()
+    result = await toolset.get_print_info()
 
     assert result["ok"] is True
     assert result["reportType"] == 1
@@ -152,10 +152,10 @@ def test_get_print_info_uses_header_report_name():
     assert api.calls[0][2:] == (REPORT_NAME, 1)
 
 
-def test_new_style_returns_values_required_by_save_style():
+async def test_new_style_returns_values_required_by_save_style():
     toolset, api = _toolset("print:read", "print:write")
 
-    result = toolset.new_style("1", " 图片还原模板 ")
+    result = await toolset.new_style("1", " 图片还原模板 ")
 
     assert result == {
         "ok": True,
@@ -169,21 +169,21 @@ def test_new_style_returns_values_required_by_save_style():
     assert api.calls[0][2:] == (REPORT_NAME, 1, "图片还原模板")
 
 
-def test_new_style_requires_write_scope():
+async def test_new_style_requires_write_scope():
     toolset, api = _toolset("print:read")
 
-    result = toolset.new_style(1, "图片还原模板")
+    result = await toolset.new_style(1, "图片还原模板")
 
     assert result["ok"] is False
     assert result["error"]["code"] == "CAPABILITY_FORBIDDEN"
     assert api.calls == []
 
 
-def test_save_style_passes_native_template_object():
+async def test_save_style_passes_native_template_object():
     toolset, api = _toolset("print:read", "print:write")
     template = _valid_template()
 
-    result = toolset.save_style(
+    result = await toolset.save_style(
         1,
         "图片还原模板",
         "2086707921336647680",
@@ -203,21 +203,21 @@ def test_save_style_passes_native_template_object():
     )
 
 
-def test_save_style_rejects_empty_template_before_remote_call():
+async def test_save_style_rejects_empty_template_before_remote_call():
     toolset, api = _toolset("print:read", "print:write")
 
-    result = toolset.save_style(1, "图片还原模板", "style-1", {})
+    result = await toolset.save_style(1, "图片还原模板", "style-1", {})
 
     assert result["ok"] is False
     assert result["error"]["code"] == "STYLE_CONTENT_INVALID"
     assert api.calls == []
 
 
-def test_save_style_rejects_non_native_format():
+async def test_save_style_rejects_non_native_format():
     """拒绝 version/components 等自定义格式。"""
     toolset, api = _toolset("print:read", "print:write")
 
-    result = toolset.save_style(1, "图片还原模板", "style-1", {
+    result = await toolset.save_style(1, "图片还原模板", "style-1", {
         "version": "1.0.0",
         "page": {"width": 210, "height": 297},
         "components": [{"type": "text", "content": "标题"}],
@@ -229,10 +229,10 @@ def test_save_style_rejects_non_native_format():
     assert api.calls == []
 
 
-def test_save_style_rejects_missing_pages():
+async def test_save_style_rejects_missing_pages():
     toolset, api = _toolset("print:read", "print:write")
 
-    result = toolset.save_style(1, "图片还原模板", "style-1", {
+    result = await toolset.save_style(1, "图片还原模板", "style-1", {
         "ReportName": REPORT_NAME,
     })
 
@@ -242,10 +242,10 @@ def test_save_style_rejects_missing_pages():
     assert api.calls == []
 
 
-def test_save_style_rejects_page_without_classname():
+async def test_save_style_rejects_page_without_classname():
     toolset, api = _toolset("print:read", "print:write")
 
-    result = toolset.save_style(1, "图片还原模板", "style-1", {
+    result = await toolset.save_style(1, "图片还原模板", "style-1", {
         "ReportName": REPORT_NAME,
         "Pages": [{"BandAreas": []}],
     })
@@ -256,10 +256,10 @@ def test_save_style_rejects_page_without_classname():
     assert api.calls == []
 
 
-def test_save_style_rejects_page_without_bandareas():
+async def test_save_style_rejects_page_without_bandareas():
     toolset, api = _toolset("print:read", "print:write")
 
-    result = toolset.save_style(1, "图片还原模板", "style-1", {
+    result = await toolset.save_style(1, "图片还原模板", "style-1", {
         "ReportName": REPORT_NAME,
         "Pages": [{"ClassName": "TTemplatePage"}],
     })
@@ -270,7 +270,7 @@ def test_save_style_rejects_page_without_bandareas():
     assert api.calls == []
 
 
-def test_save_style_rejects_multiple_tables_per_page():
+async def test_save_style_rejects_multiple_tables_per_page():
     """拒绝单页面包含多个 TTableElement 表格元素。"""
     toolset, api = _toolset("print:read", "print:write")
     template = _valid_template()
@@ -279,7 +279,7 @@ def test_save_style_rejects_multiple_tables_per_page():
         {"ClassName": "TTableElement", "Rows": []},
     ]
 
-    result = toolset.save_style(1, "图片还原模板", "style-1", template)
+    result = await toolset.save_style(1, "图片还原模板", "style-1", template)
 
     assert result["ok"] is False
     assert result["error"]["code"] == "STYLE_CONTENT_INVALID"
@@ -287,7 +287,7 @@ def test_save_style_rejects_multiple_tables_per_page():
     assert api.calls == []
 
 
-def test_save_style_rejects_template_without_field_bindings():
+async def test_save_style_rejects_template_without_field_bindings():
     """拒绝有表格行但无字段绑定（@/#/^）的模板，防止固化数据值。"""
     toolset, api = _toolset("print:read", "print:write")
     template = _valid_template()
@@ -298,7 +298,7 @@ def test_save_style_rejects_template_without_field_bindings():
         ],
     }]
 
-    result = toolset.save_style(1, "报价单", "style-1", template)
+    result = await toolset.save_style(1, "报价单", "style-1", template)
 
     assert result["ok"] is False
     assert result["error"]["code"] == "STYLE_CONTENT_INVALID"
@@ -306,7 +306,7 @@ def test_save_style_rejects_template_without_field_bindings():
     assert api.calls == []
 
 
-def test_save_style_accepts_template_with_field_bindings():
+async def test_save_style_accepts_template_with_field_bindings():
     """有字段绑定（@/#/^）的模板通过校验。"""
     toolset, api = _toolset("print:read", "print:write")
     template = _valid_template()
@@ -317,33 +317,33 @@ def test_save_style_accepts_template_with_field_bindings():
         ],
     }]
 
-    result = toolset.save_style(1, "报价单", "style-1", template)
+    result = await toolset.save_style(1, "报价单", "style-1", template)
 
     assert result["ok"] is True
     assert api.calls != []
 
 
-def test_multi_turn_edit_restores_latest_template_and_reuses_style_id():
+async def test_multi_turn_edit_restores_latest_template_and_reuses_style_id():
     toolset, _api = _toolset("print:read", "print:write")
     style_id = "2086707921336647680"
     first_template = _valid_template()
     edited_template = _valid_template()
 
-    created = toolset.new_style(1, "图片还原模板")
-    first_saved = toolset.save_style(
+    created = await toolset.new_style(1, "图片还原模板")
+    first_saved = await toolset.save_style(
         created["reportType"],
         created["styleName"],
         created["styleId"],
         first_template,
     )
-    first_info = toolset.get_print_info()
-    second_saved = toolset.save_style(
+    first_info = await toolset.get_print_info()
+    second_saved = await toolset.save_style(
         first_info["currentStyle"]["reportType"],
         first_info["currentStyle"]["styleName"],
         first_info["currentStyle"]["styleId"],
         edited_template,
     )
-    second_info = toolset.get_print_info()
+    second_info = await toolset.get_print_info()
 
     assert created["styleId"] == style_id
     assert first_saved["revision"] == 1

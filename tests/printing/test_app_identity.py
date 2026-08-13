@@ -10,16 +10,19 @@ from types import SimpleNamespace
 
 import pytest
 
+from gjp_common.context import InvocationContextStore
 from gjp_common.errors import DomainError
+from gjp_common.mcp import StaticToolSetResolver
+from yunprint.adapters import YunPrintAccessTokenAdapter
 from yunprint.app import (
     BearerConnectionStore,
     OpaqueTokenIdentityResolver,
-    PrintToolSetResolver,
     _bearer_token_from_mcp_context,
     _context_from_token,
     _mcp_session_hint,
     _report_name_from_mcp_context,
 )
+from yunprint.toolset import PrintToolSet
 
 
 def _mcp_request(
@@ -239,18 +242,22 @@ def test_store_get_report_name_empty_when_not_registered():
     assert store.get_report_name(context) == ""
 
 
-# --- PrintToolSetResolver 共享多轮状态 ---
+# --- StaticToolSetResolver 单实例复用 ---
 
 
-def test_toolset_resolver_reuses_stateful_toolset(monkeypatch):
+def test_static_toolset_resolver_returns_same_instance(monkeypatch):
+    """消除双重实例化后，schema 与 runtime 共用同一 PrintToolSet。"""
     monkeypatch.setenv("YUNPRINT_BASE_URL", "https://example.test")
     store = BearerConnectionStore()
-    resolver = PrintToolSetResolver(store)
+    toolset = PrintToolSet(
+        api=YunPrintAccessTokenAdapter(connection_provider=store),
+        contexts=InvocationContextStore(),
+        report_name_resolver=store.get_report_name,
+    )
+    resolver = StaticToolSetResolver(toolset)
 
     ctx_a = _context_from_token("token-a")
     ctx_b = _context_from_token("token-b")
 
-    toolset_a = resolver.resolve(ctx_a)
-    toolset_b = resolver.resolve(ctx_b)
-    assert toolset_a is toolset_b
-    assert resolver.resolve(ctx_a) is toolset_a
+    assert resolver.resolve(ctx_a) is toolset
+    assert resolver.resolve(ctx_b) is toolset

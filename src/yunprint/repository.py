@@ -1,14 +1,14 @@
-"""云打印三个模板样式 API 的 HTTP 客户端。"""
+"""云打印三个模板样式 API 的异步 HTTP 客户端。"""
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import socket
 import time
-import urllib.error
-import urllib.request
 from typing import Any
+
+import httpx
 
 from gjp_common.errors import DomainError
 from gjp_common.logging_config import (
@@ -30,13 +30,14 @@ class YunPrintRepository:
         if not self.base_url.startswith("https://"):
             raise DomainError("YUNPRINT_CONFIG_INVALID", "云打印地址必须使用 HTTPS")
 
-    def _post_result(
+    async def _post_result(
         self,
         path: str,
         payload: dict[str, Any],
         *,
         allow_retries: bool = True,
     ) -> Any:
+        """发送 POST 请求并解析云打印业务信封，支持异步重试。"""
         started = time.perf_counter()
         url = self.base_url + "/" + path.lstrip("/")
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -50,41 +51,39 @@ class YunPrintRepository:
                     json.dumps(payload, ensure_ascii=False),
                 ),
             )
-        request = urllib.request.Request(
-            url,
-            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers=headers,
-            method="POST",
-        )
         max_attempts = self.max_retries if allow_retries else 1
+        body: dict[str, Any] | None = None
         for attempt in range(1, max_attempts + 1):
             try:
-                with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
-                    body = json.loads(response.read().decode("utf-8"))
+                async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                    response = await client.post(url, json=payload, headers=headers)
+                response.raise_for_status()
+                body = response.json()
                 break
-            except urllib.error.HTTPError as exc:
-                if exc.code >= 500 and attempt < max_attempts:
+            except httpx.HTTPStatusError as exc:
+                status = exc.response.status_code
+                if status >= 500 and attempt < max_attempts:
                     logger.warning(
                         "云打印接口HTTP %d，第%d次重试 api=%s",
-                        exc.code,
+                        status,
                         attempt,
                         path,
                     )
-                    time.sleep(0.5 * (2 ** (attempt - 1)))
+                    await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
                     continue
-                logger.error("云打印接口HTTP失败 api=%s status=%s", path, exc.code)
+                logger.error("云打印接口HTTP失败 api=%s status=%s", path, status)
                 raise DomainError(
                     "YUNPRINT_REQUEST_FAILED",
-                    "云打印接口返回 HTTP %s" % exc.code,
+                    "云打印接口返回 HTTP %s" % status,
                 ) from exc
-            except (urllib.error.URLError, socket.timeout, TimeoutError) as exc:
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadError) as exc:
                 if attempt < max_attempts:
                     logger.warning(
                         "云打印接口网络失败，第%d次重试 api=%s",
                         attempt,
                         path,
                     )
-                    time.sleep(0.5 * (2 ** (attempt - 1)))
+                    await asyncio.sleep(0.5 * (2 ** (attempt - 1)))
                     continue
                 logger.error("云打印接口网络失败 api=%s", path)
                 raise DomainError(
@@ -98,6 +97,7 @@ class YunPrintRepository:
                     "云打印接口返回的不是 JSON",
                 ) from exc
 
+        assert body is not None
         result = body.get("result") if isinstance(body, dict) else None
         if not isinstance(result, dict) or not isinstance(result.get("success"), bool):
             raise DomainError("YUNPRINT_RESPONSE_INVALID", "云打印接口响应信封无效")
@@ -120,14 +120,14 @@ class YunPrintRepository:
             )
         return result.get("data")
 
-    def get_print_info(
+    async def get_print_info(
         self,
         token: str,
         report_name: str,
         report_type: int,
         is_dynamic_base_style: bool | str = "",
     ) -> dict[str, Any]:
-        data = self._post_result(
+        data = await self._post_result(
             "ElectronPrintApi/GetPrintInfo",
             {
                 "token": token,
@@ -145,7 +145,7 @@ class YunPrintRepository:
             raise DomainError("YUNPRINT_RESPONSE_INVALID", "打印信息不是对象")
         return data
 
-    def new_style(
+    async def new_style(
         self,
         token: str,
         report_name: str,
@@ -153,7 +153,7 @@ class YunPrintRepository:
         style_name: str,
     ) -> dict[str, Any]:
         """在指定报表分类下创建空白模板样式并返回样式记录。"""
-        data = self._post_result(
+        data = await self._post_result(
             "ElectronPrintApi/NewStyle",
             {
                 "token": token,
@@ -175,7 +175,7 @@ class YunPrintRepository:
             raise DomainError("YUNPRINT_RESPONSE_INVALID", "新增样式结果缺少模板 ID")
         return data
 
-    def save_style(
+    async def save_style(
         self,
         token: str,
         report_name: str,
@@ -196,7 +196,7 @@ class YunPrintRepository:
                 "STYLE_CONTENT_INVALID",
                 "模板样式不是可序列化的 JSON 对象",
             ) from exc
-        return self._post_result(
+        return await self._post_result(
             "ElectronPrintApi/SaveStyle",
             {
                 "token": token,

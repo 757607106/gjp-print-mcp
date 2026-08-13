@@ -16,17 +16,17 @@ def test_repository_requires_https():
         YunPrintRepository("http://example.test")
 
 
-def test_get_print_info_uses_complete_style_payload(monkeypatch: pytest.MonkeyPatch):
+async def test_get_print_info_uses_complete_style_payload(monkeypatch: pytest.MonkeyPatch):
     repository = YunPrintRepository("https://example.test")
     captured: dict[str, Any] = {}
 
-    def fake_post(path: str, payload: dict[str, Any], *, allow_retries: bool = True):
+    async def fake_post(path: str, payload: dict[str, Any], *, allow_retries: bool = True):
         captured.update(path=path, payload=payload, allow_retries=allow_retries)
         return {"styleInfo": {"styleNames": []}}
 
     monkeypatch.setattr(repository, "_post_result", fake_post)
 
-    result = repository.get_print_info("secret-token", "销售单", 1)
+    result = await repository.get_print_info("secret-token", "销售单", 1)
 
     assert result == {"styleInfo": {"styleNames": []}}
     assert captured == {
@@ -46,7 +46,7 @@ def test_get_print_info_uses_complete_style_payload(monkeypatch: pytest.MonkeyPa
     }
 
 
-def test_new_style_uses_non_retrying_write_contract(monkeypatch: pytest.MonkeyPatch):
+async def test_new_style_uses_non_retrying_write_contract(monkeypatch: pytest.MonkeyPatch):
     repository = YunPrintRepository("https://example.test")
     captured: dict[str, Any] = {}
     created = {
@@ -56,13 +56,13 @@ def test_new_style_uses_non_retrying_write_contract(monkeypatch: pytest.MonkeyPa
         "styleName": "图片还原模板",
     }
 
-    def fake_post(path: str, payload: dict[str, Any], *, allow_retries: bool = True):
+    async def fake_post(path: str, payload: dict[str, Any], *, allow_retries: bool = True):
         captured.update(path=path, payload=payload, allow_retries=allow_retries)
         return created
 
     monkeypatch.setattr(repository, "_post_result", fake_post)
 
-    assert repository.new_style("secret-token", "销售单", 1, "图片还原模板") == created
+    assert await repository.new_style("secret-token", "销售单", 1, "图片还原模板") == created
     assert captured["path"] == "ElectronPrintApi/NewStyle"
     assert captured["allow_retries"] is False
     assert captured["payload"] == {
@@ -78,32 +78,32 @@ def test_new_style_uses_non_retrying_write_contract(monkeypatch: pytest.MonkeyPa
     }
 
 
-def test_new_style_requires_returned_template_id(monkeypatch: pytest.MonkeyPatch):
+async def test_new_style_requires_returned_template_id(monkeypatch: pytest.MonkeyPatch):
     repository = YunPrintRepository("https://example.test")
-    monkeypatch.setattr(
-        repository,
-        "_post_result",
-        lambda *_args, **_kwargs: {"styleName": "缺少 ID"},
-    )
+
+    async def fake_post(*_args, **_kwargs):
+        return {"styleName": "缺少 ID"}
+
+    monkeypatch.setattr(repository, "_post_result", fake_post)
 
     with pytest.raises(DomainError) as exc:
-        repository.new_style("secret-token", "销售单", 1, "缺少 ID")
+        await repository.new_style("secret-token", "销售单", 1, "缺少 ID")
 
     assert exc.value.code == "YUNPRINT_RESPONSE_INVALID"
 
 
-def test_save_style_serializes_template_and_disables_retries(monkeypatch: pytest.MonkeyPatch):
+async def test_save_style_serializes_template_and_disables_retries(monkeypatch: pytest.MonkeyPatch):
     repository = YunPrintRepository("https://example.test")
     captured: dict[str, Any] = {}
     template = {"ReportName": "销售单", "Pages": [{"PageIndex": 0}]}
 
-    def fake_post(path: str, payload: dict[str, Any], *, allow_retries: bool = True):
+    async def fake_post(path: str, payload: dict[str, Any], *, allow_retries: bool = True):
         captured.update(path=path, payload=payload, allow_retries=allow_retries)
         return {"saved": True}
 
     monkeypatch.setattr(repository, "_post_result", fake_post)
 
-    result = repository.save_style(
+    result = await repository.save_style(
         "secret-token",
         "销售单",
         1,

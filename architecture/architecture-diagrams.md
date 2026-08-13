@@ -43,20 +43,20 @@ sequenceDiagram
     participant Adapter as Token Adapter
     participant API as 云打印 API
 
-    Agent->>MCP: get_print_info()  (reportName 由 X-Report-Name 头注入)
+    Agent->>MCP: getPrintInfo()  (reportName 由 X-Report-Name 头注入)
     MCP->>Adapter: context + report_name(头) + reportType=1
     Adapter->>API: POST GetPrintInfo + token
     API-->>Agent: 已有样式与打印信息
 
-    Agent->>MCP: new_style(report_type, style_name)
+    Agent->>MCP: newStyle(report_type, style_name)
     Adapter->>API: POST NewStyle + token
     API-->>Agent: styleId 等创建结果
 
-    Agent->>MCP: save_style(report_type, style_name, style_id, style_content)
+    Agent->>MCP: saveStyle(report_type, style_name, style_id, style_content)
     Adapter->>API: POST SaveStyle + token
     API-->>Agent: 保存结果
 
-    Agent->>MCP: 下一轮 get_print_info()
+    Agent->>MCP: 下一轮 getPrintInfo()
     MCP-->>Agent: currentStyle + 最新 styleContent
-    Agent->>MCP: save_style(同一 styleId, 修改后的完整 JSON)  (reportName 由头注入)
+    Agent->>MCP: saveStyle(同一 styleId, 修改后的完整 JSON)  (reportName 由头注入)
 ```

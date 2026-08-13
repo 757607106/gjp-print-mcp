@@ -14,7 +14,7 @@
 打印产品 → 各 AI 平台智能体 → 绑定 yunprint-print MCP → 调用打印业务 API
 ```
 
-MCP 只发布 `get_print_info`、`new_style`、`save_style`。视觉模型识别用户图片并生成模板 JSON，随后通过三个工具查询参考样式、创建模板和保存模板。
+MCP 只发布 `getPrintInfo`、`newStyle`、`saveStyle`。视觉模型识别用户图片并生成模板 JSON，随后通过三个工具查询参考样式、创建模板和保存模板。
 
 ## 鉴权与安全设计
 
@@ -22,7 +22,9 @@ MCP 只发布 `get_print_info`、`new_style`、`save_style`。视觉模型识别
 - **token 和 reportName 均由请求头注入**：token 在 `Authorization: Bearer` 头，reportName 在 `X-Report-Name` 头（URL 编码）。两者不进入工具参数、Tool Schema 或模型上下文。
 - **对接方按入口动态传入**：不同对接方入口对应不同的 token 和 reportName，在 MCP HTTP 请求头中动态设置。
 - **base_url 部署级固定**：云打印业务 API 地址通过 `YUNPRINT_BASE_URL` 环境变量配置。
-- **身份隔离**：`OpaqueTokenIdentityResolver` 从 Authorization 头派生 `InvocationContext`，`BearerConnectionStore` 按会话保存 token 和 reportName，通过 `ContextVar` 绑定到当前异步任务。
+- **身份隔离**：`OpaqueTokenIdentityResolver` 从 Authorization 头派生 `InvocationContext`，`BearerConnectionStore` 按会话保存 token 和 reportName（TTL 自动清理，默认 2 小时），通过 `ContextVar` 绑定到当前异步任务。
+- **权限对齐**：`BusinessFunctionTool.check_permissions` 从 `ContextVar` 读取 `InvocationContext` 并校验 `required_scope`，将 AgentScope 框架权限系统与项目 scope 体系对齐；MCP 服务端在 `_invoke_tool` 中显式触发权限检查。
+- **异步 IO**：Repository 使用 `httpx.AsyncClient` 异步 HTTP 客户端，全链路无阻塞 IO，不污染 asyncio 事件循环。
 - **媒体边界**：业务方在调用 Agent 前把语音和图片转换并确认为文本；MCP 不处理音频、图片、附件、ASR 或 OCR。
 
 ## 技术栈
@@ -33,6 +35,7 @@ MCP 只发布 `get_print_info`、`new_style`、`save_style`。视觉模型识别
 | 工具开发 | [Tool 参考](https://docs.agentscope.io/versions/2.0.4/zh/building-blocks/tool) |
 | 语言 | Python >= 3.11 |
 | 包管理 | uv + pyproject.toml |
+| HTTP 客户端 | httpx（异步 AsyncClient） |
 | MCP 协议 | mcp >= 1.28（Streamable HTTP） |
 | 模型支持 | OpenAI / Anthropic / DashScope / DeepSeek / Gemini / Moonshot / xAI / Ollama |
 
@@ -42,6 +45,7 @@ MCP 只发布 `get_print_info`、`new_style`、`save_style`。视觉模型识别
 src/
 ├── yunprint/                  # 打印服务包：App、ToolSet、Port、Adapter、Prompt、MCP
 └── gjp_common/                # 业务无关公共层：上下文、连接、MCP、配置、路径、日志
+deploy/                        # Windows Server 部署脚本：install-service、update、rollback
 ```
 
 `ToolSet` 是 Agent 与 MCP 的唯一工具来源。`create_print_mcp_service` 有 `isinstance` 类型守卫，确保只发布 `PrintToolSet`。`TemplateConversationStore` 仅保存三个工具间的当前模板 JSON 和修订号，不定义工具。
@@ -67,6 +71,8 @@ src/
 - `architecture/business-data-flow.md` — 业务数据与数据流梳理
 - `architecture/saas-mcp-integration.md` — SaaS 对话页与 MCP 租户连接方案
 - `architecture/tool-api-reference.md` — 三个工具与业务 API 契约
+- `architecture/local-ngrok-setup.md` — 本地 ngrok 内网穿透启动指南
+- `architecture/windows-server-deploy.md` — Windows Server 2019 部署与更新指南
 
 ### 本地开发
 
