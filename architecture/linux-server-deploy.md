@@ -1,8 +1,8 @@
 # Linux 服务器部署与更新指南
 
 yunprint-print MCP 服务在 Linux 服务器（CentOS / Ubuntu / Debian 等）上的完整部署、
-日常更新和运维指南。使用 systemd 将服务注册为系统服务，配合 Bash 脚本实现
-一键更新和回滚，停机时间约 3-5 秒。
+日常更新和运维指南。通过 `scripts/deploy.sh` 一键完成停服务、拉代码、同步依赖、
+重启和验证，自动检测 systemd 或 nohup 方式。
 
 ## 目录
 
@@ -22,17 +22,12 @@ yunprint-print MCP 服务在 Linux 服务器（CentOS / Ubuntu / Debian 等）�
 
 ```
 GitHub 仓库 (757607106/gjp-print-mcp)
-    ↓ git pull
+    ↓ git fetch + reset --hard
 Linux 服务器
-    ├── systemd 系统服务（守护 uvicorn 进程）
-    │   ├── 服务名: yunprint-print
-    │   ├── 监听: 0.0.0.0:8931
-    │   ├── 开机自启: 是
-    │   ├── 崩溃重启: 5 秒后自动恢复（Restart=on-failure）
-    │   └── 日志托管: journald（自动轮转）
-    ├── deploy/update.sh             ← 一键更新（频繁使用）
-    ├── deploy/rollback.sh           ← 一键回滚
-    ├── deploy/install-service.sh    ← 首次安装（一次性）
+    ├── 服务进程（python -m yunprint，监听 0.0.0.0:8931）
+    │   ├── systemd 方式（生产推荐）：开机自启、崩溃 5 秒自动重启、journald 日志
+    │   └── nohup 方式（快速验证）：日志写入 /var/log/yunprint-print-mcp.log
+    ├── scripts/deploy.sh          ← 一键部署脚本（停服务→拉代码→依赖→重启→验证）
     └── Nginx 反向代理 + HTTPS（可选，生产推荐）
 ```
 
@@ -63,12 +58,12 @@ Linux 服务器
 
 ## 首次部署
 
-> 以下所有命令以 **root** 身份执行，部署目录默认 `/root/gjp-print-mcp`。
+> 以下所有命令以 **root** 身份执行，部署目录 `/root/gjp-print-mcp`。
 
 ### 第 1 步：安装 Git
 
 ```bash
-# CentOS / RHEL
+# CentOS / RHEL / Alibaba Cloud Linux
 yum install -y git
 
 # Ubuntu / Debian
@@ -84,7 +79,6 @@ git --version
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
-source ~/.bashrc
 uv --version
 ```
 
@@ -97,6 +91,12 @@ tar -xzf /tmp/uv.tar.gz -C /tmp/uv-extract
 install -m 755 /tmp/uv-extract/uv-x86_64-unknown-linux-gnu/uv /usr/local/bin/uv
 install -m 755 /tmp/uv-extract/uv-x86_64-unknown-linux-gnu/uvx /usr/local/bin/uvx
 uv --version
+```
+
+如需 Python 3.11+（系统自带版本过低时）：
+
+```bash
+uv python install 3.11
 ```
 
 ### 第 3 步：克隆项目
@@ -113,7 +113,7 @@ cd gjp-print-mcp
 uv sync
 ```
 
-uv 自动下载独立 Python 3.11+ 并创建虚拟环境。验证：
+uv 自动使用托管的 Python 3.11+ 创建虚拟环境。验证：
 
 ```bash
 .venv/bin/python --version
@@ -150,10 +150,35 @@ YUNPRINT_TIMEOUT_SECONDS=30
 > 不要在 `.env` 中保存云打印用户 Token——Token 由 Agent 平台通过
 > `Authorization` 请求头动态传入。
 
-### 第 6 步：开放防火墙端口
+### 第 6 步：一键启动并验证
 
 ```bash
-# firewalld（CentOS）
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
+```
+
+首次运行时 systemd 服务尚未注册，脚本自动以 nohup 方式拉起服务，
+并依次验证进程、端口和 MCP 握手。预期输出：
+
+```
+[INFO] ===== yunprint-print MCP 服务快速部署 =====
+[INFO] 1/5 停止当前服务...
+[INFO] 2/5 拉取最新 main 分支代码...
+[INFO] 当前版本：xxxxxxx 部署迁移：...
+[INFO] 3/5 同步项目依赖...
+[INFO] 4/5 启动服务...
+[INFO] nohup 服务已启动 PID=12345
+[INFO] 5/5 验证服务状态...
+[INFO] 进程运行中 ✓
+[INFO] 端口 8931 监听中 ✓
+[INFO] MCP 握手检查通过 ✓
+[INFO] ===== 部署完成 =====
+```
+
+### 第 7 步：开放防火墙端口
+
+```bash
+# firewalld（CentOS / Alibaba Cloud Linux）
 firewall-cmd --permanent --add-port=8931/tcp
 firewall-cmd --reload
 
@@ -163,22 +188,16 @@ ufw allow 8931/tcp
 
 > 云服务器（阿里云 / 腾讯云等）还需在控制台**安全组**中放行 TCP 8931。
 
-### 第 7 步：注册 systemd 服务
+### 第 8 步：systemd 服务化（生产推荐）
+
+nohup 方式在服务器重启后不会自动恢复。生产环境创建
+`/etc/systemd/system/yunprint-print.service`：
 
 ```bash
-cd /root/gjp-print-mcp/deploy
-chmod +x install-service.sh update.sh rollback.sh
-sudo ./install-service.sh
+vim /etc/systemd/system/yunprint-print.service
 ```
 
-脚本会自动完成以下操作：
-
-- 检查 `.venv` 虚拟环境和 `.env` 文件是否存在
-- 生成 `/etc/systemd/system/yunprint-print.service` 单元文件
-- 配置崩溃自动重启（5 秒后）与开机自启
-- 启动服务并验证运行状态
-
-生成的单元文件等价于：
+写入（若部署目录不同请相应调整）：
 
 ```ini
 [Unit]
@@ -196,42 +215,14 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-预期输出：
-
-```
-[INFO] === 服务安装完成 ===
-服务名:   yunprint-print
-项目目录: /root/gjp-print-mcp
-监听地址: 0.0.0.0:8931
-```
-
-### 第 8 步：验证服务
+再执行一次部署脚本，它会自动停止 nohup 进程并切换到 systemd 方式：
 
 ```bash
-# 检查服务状态
-systemctl status yunprint-print
-# 预期: Active: active (running)
-
-# 检查端口监听
-ss -ltnp | grep 8931
-# 预期: LISTEN 0 ... 0.0.0.0:8931 ...
+./scripts/deploy.sh
 ```
 
-发送 MCP 握手请求验证服务可用性：
-
-```bash
-curl -s -i -X POST http://127.0.0.1:8931/mcp \
-  -H "Authorization: Bearer <你的云打印Token>" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"manual-check","version":"1.0"}}}'
-```
-
-预期响应：
-
-- HTTP `200`
-- 响应头包含 `mcp-session-id`
-- 响应体 JSON 中 `serverInfo.name` 为 `yunprint-print`
+预期输出 `4/5 启动服务...` 后显示 `systemd 服务已启动`。此后服务具备
+开机自启、崩溃 5 秒自动重启能力。
 
 ### 第 9 步（可选）：Nginx 反向代理 + HTTPS
 
@@ -293,7 +284,7 @@ nginx -s reload
 
 ## 服务管理
 
-服务注册后，使用以下命令管理：
+systemd 方式注册后，使用以下命令管理：
 
 | 操作 | 命令 |
 |---|---|
@@ -304,89 +295,117 @@ nginx -s reload
 | 查看日志 | `journalctl -u yunprint-print -n 100 --no-pager` |
 | 实时查看日志 | `journalctl -u yunprint-print -f` |
 
+nohup 方式的日志位于 `/var/log/yunprint-print-mcp.log`：
+
+```bash
+tail -f /var/log/yunprint-print-mcp.log
+```
+
 ---
 
 ## 日常更新
 
 > 这是频繁更新时最常用的操作，只需一条命令。
 
-### 更新命令
+```bash
+cd /root/gjp-print-mcp
+./scripts/deploy.sh
+```
+
+常用场景：
 
 ```bash
-cd /root/gjp-print-mcp/deploy
-sudo ./update.sh
+# 部署 main 分支（默认，生产环境）
+./scripts/deploy.sh
+
+# 部署 test 分支（测试环境）
+BRANCH=test ./scripts/deploy.sh
+
+# DEBUG 模式（临时调试，仅 nohup 方式生效）
+./scripts/deploy.sh --debug
 ```
 
-### 更新到指定分支
-
-```bash
-sudo ./update.sh -b dev
-```
-
-### 脚本执行流程
+脚本执行流程：
 
 ```
-[1/5] 拉取最新代码 (main)...        ← 1-3 秒（服务继续运行旧版本）
-[2/5] 同步依赖...                   ← 3-10 秒（服务继续运行旧版本）
-[3/5] 重启服务（停机开始）...        ← 此刻开始停机
-[4/5] 等待服务启动...               ← 2 秒
-[5/5] 健康检查...                   ← 1-3 秒
-=== 更新完成 ===
-停机时间: 约 3-5 秒
+[INFO] 1/5 停止当前服务...            ← systemd 或 nohup 自动检测
+[INFO] 2/5 拉取最新 main 分支代码...   ← git fetch + reset --hard
+[INFO] 3/5 同步项目依赖...            ← uv sync
+[INFO] 4/5 启动服务...                ← 停机窗口开始
+[INFO] 5/5 验证服务状态...            ← 进程 + 端口 + MCP 握手
+[INFO] ===== 部署完成 =====
 ```
 
-**设计要点**：`git reset --hard` 和 `uv sync` 在服务重启之前执行，服务仍在
-运行旧版本。只有 `systemctl restart` 的瞬间才停机，将停机窗口压缩到 3-5 秒。
-
-> **注意**：`git reset --hard origin/main` 会丢弃部署机上的本地改动。
+> **注意**：`git reset --hard origin/<分支>` 会丢弃部署机上的本地改动。
 > 生产部署机不应直接修改代码；`.env` 不在 Git 管理中，不受影响。
-
-### 无更新时自动跳过
-
-如果远程没有新提交，脚本会直接退出，不重启服务：
-
-```
-[1/5] 拉取最新代码 (main)...
-[INFO] 已是最新版本，无需更新
-```
 
 ---
 
 ## 版本回滚
 
-当更新后发现问题，需要快速回退到上一个版本：
-
-### 回退到上一个提交
+更新后发现问题，手动回退到上一版本（或指定提交）：
 
 ```bash
-cd /root/gjp-print-mcp/deploy
-sudo ./rollback.sh
+cd /root/gjp-print-mcp
+
+# 回退到上一个提交
+git checkout HEAD~1
+
+# 或回退到指定提交
+git checkout abc1234
+
+# 同步依赖并重启（systemd 方式）
+uv sync
+systemctl restart yunprint-print
 ```
 
-### 回退到指定提交
+验证：
 
 ```bash
-sudo ./rollback.sh abc1234
+git log --oneline -1
+systemctl status yunprint-print
 ```
 
-### 回滚后回到最新版本
+回滚后回到最新版本：
 
 ```bash
 cd /root/gjp-print-mcp
 git checkout main
-git pull
-cd deploy && sudo ./update.sh
+./scripts/deploy.sh
 ```
 
 ---
 
 ## 临时 DEBUG 调试
 
-排查业务 API 调用、鉴权问题需要 DEBUG 日志时，用 systemd override
-临时调整，不修改主单元文件：
+排查业务 API 调用、鉴权问题需要 DEBUG 日志时：
+
+**nohup 方式**（推荐用于临时调试）：直接用部署脚本一键切换：
 
 ```bash
-# 创建 override 并添加 DEBUG 环境变量
+cd /root/gjp-print-mcp
+
+# 先切换到 nohup 方式运行（若当前是 systemd 方式）
+systemctl stop yunprint-print 2>/dev/null; systemctl disable yunprint-print 2>/dev/null
+
+# DEBUG 模式重启
+./scripts/deploy.sh --debug
+
+# 实时跟踪日志
+tail -f /var/log/yunprint-print-mcp.log
+```
+
+调试完毕切回 INFO 并恢复 systemd：
+
+```bash
+./scripts/deploy.sh --debug   # 再次运行时去掉 --debug 即为 INFO
+systemctl enable --now yunprint-print
+./scripts/deploy.sh
+```
+
+**systemd 方式**（不中断 systemd 托管）：用 override 临时调整：
+
+```bash
 systemctl edit yunprint-print
 ```
 
@@ -397,22 +416,8 @@ systemctl edit yunprint-print
 Environment=GJP_LOG_LEVEL=DEBUG
 ```
 
-保存后重启生效：
-
-```bash
-systemctl restart yunprint-print
-journalctl -u yunprint-print -f
-```
-
-调试完毕恢复 INFO：
-
-```bash
-# 移除 override 并重启
-rm -f /etc/systemd/system/yunprint-print.service.d/override.conf
-rmdir /etc/systemd/system/yunprint-print.service.d 2>/dev/null || true
-systemctl daemon-reload
-systemctl restart yunprint-print
-```
+保存后 `systemctl restart yunprint-print` 生效，用
+`journalctl -u yunprint-print -f` 查看日志。调试完毕移除 override 并重启。
 
 > **安全提示**：DEBUG 级别会输出含 Token 的完整请求头，仅用于临时调试，
 > 排查完毕必须恢复 `INFO`。
@@ -421,27 +426,25 @@ systemctl restart yunprint-print
 
 ## 运维速查
 
-### 常用操作一览
-
 ```bash
-# === 更新 ===
-cd /root/gjp-print-mcp/deploy
-sudo ./update.sh                      # 一键更新
-sudo ./rollback.sh                    # 一键回滚
+# === 部署 ===
+cd /root/gjp-print-mcp
+./scripts/deploy.sh                      # 一键部署 main 分支
+BRANCH=test ./scripts/deploy.sh          # 部署 test 分支
+./scripts/deploy.sh --debug              # DEBUG 模式部署
 
-# === 服务管理 ===
-systemctl start yunprint-print        # 启动
-systemctl stop yunprint-print         # 停止
-systemctl restart yunprint-print      # 重启
-systemctl status yunprint-print       # 状态
+# === 服务管理（systemd 方式） ===
+systemctl start yunprint-print           # 启动
+systemctl stop yunprint-print            # 停止
+systemctl restart yunprint-print         # 重启
+systemctl status yunprint-print          # 状态
 
 # === 日志 ===
-journalctl -u yunprint-print -f       # 实时日志
-journalctl -u yunprint-print -n 50 --no-pager   # 最后 50 行
-journalctl -u yunprint-print --since "1 hour ago"  # 最近 1 小时
+journalctl -u yunprint-print -f          # systemd 实时日志
+tail -f /var/log/yunprint-print-mcp.log  # nohup 实时日志
 
 # === 网络 ===
-ss -ltnp | grep 8931                  # 检查端口
+ss -ltnp | grep 8931                     # 检查端口
 curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:8931/mcp \
   -H "Authorization: Bearer health-check" \
   -H "Content-Type: application/json" \
@@ -451,20 +454,14 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:8931/mcp \
 
 # === Git ===
 cd /root/gjp-print-mcp
-git log --oneline -5                  # 最近 5 个提交
-git rev-parse --short HEAD            # 当前版本号
+git log --oneline -5                     # 最近 5 个提交
+git rev-parse --short HEAD               # 当前版本号
 ```
 
 ### 服务器重启后
 
-服务已设置开机自启（`systemctl enable`），服务器重启后自动启动，无需手动操作。
-
-验证服务已自动启动：
-
-```bash
-systemctl is-active yunprint-print
-# 预期: active
-```
+- systemd 方式：服务开机自启，无需手动操作，`systemctl is-active yunprint-print` 验证
+- nohup 方式：不会自动恢复，需重新执行 `./scripts/deploy.sh`
 
 ---
 
@@ -474,7 +471,8 @@ systemctl is-active yunprint-print
 
 ```bash
 # 1. 查看错误日志
-journalctl -u yunprint-print -n 50 --no-pager
+tail -n 50 /var/log/yunprint-print-mcp.log          # nohup 方式
+journalctl -u yunprint-print -n 50 --no-pager       # systemd 方式
 
 # 2. 常见原因
 #    - .env 文件缺失或 YUNPRINT_BASE_URL 未配置
@@ -489,11 +487,10 @@ journalctl -u yunprint-print -n 50 --no-pager
 cd /root/gjp-print-mcp
 git log --oneline -3
 
-# 2. 查看错误日志
-journalctl -u yunprint-print -n 50 --no-pager
+# 2. 查看错误日志（同上）
 
-# 3. 快速回滚
-cd deploy && sudo ./rollback.sh
+# 3. 快速回滚（见「版本回滚」章节）
+git checkout HEAD~1 && uv sync && systemctl restart yunprint-print
 ```
 
 ### 端口被占用
@@ -505,8 +502,8 @@ ss -ltnp | grep 8931
 # 终止占用进程
 kill <PID>
 
-# 重启服务
-systemctl restart yunprint-print
+# 重新部署
+./scripts/deploy.sh
 ```
 
 ### Git reset 失败（本地有改动）
@@ -520,8 +517,8 @@ git status
 # 丢弃本地改动（谨慎！会丢失未提交的改动；.env 不受影响）
 git checkout .
 
-# 重新更新
-cd deploy && sudo ./update.sh
+# 重新部署
+./scripts/deploy.sh
 ```
 
 ### 依赖安装失败
@@ -533,39 +530,29 @@ cd /root/gjp-print-mcp
 rm -rf .venv
 uv sync
 
-# 重启服务
-systemctl restart yunprint-print
+# 重新部署
+./scripts/deploy.sh
 ```
-
-### systemd 服务被删除（误操作）
-
-```bash
-cd /root/gjp-print-mcp/deploy
-sudo ./install-service.sh
-```
-
-脚本会检测到服务不存在并重新注册。
 
 ---
 
 ## 注意事项
 
 1. **单进程部署**：当前 `BearerConnectionStore` 和 `TemplateConversationStore`
-   是进程内存状态，服务以单进程运行，单元文件中未加 `--workers` 参数。
+   是进程内存状态，服务以单进程运行，启动命令中未加 `--workers` 参数。
    多副本部署需先改为 Redis 共享状态。
 
-2. **.env 不在 Git 中**：`.env` 文件被 `.gitignore` 排除，`update.sh`
-   不会覆盖 `.env`。首次部署后无需在更新时重新配置。
+2. **.env 不在 Git 中**：`.env` 文件被 `.gitignore` 排除，部署脚本
+   `git reset --hard` 不会覆盖 `.env`。首次部署后无需在更新时重新配置。
 
-3. **日志轮转**：日志由 journald 托管，按系统策略自动轮转，无需单独
-   配置 logrotate。查看命令见 [服务管理](#服务管理)。
+3. **日志轮转**：nohup 方式日志追加写入 `/var/log/yunprint-print-mcp.log`，
+   长期运行可用 logrotate 托管；systemd 方式由 journald 自动轮转。
 
 4. **生产日志级别**：生产环境保持 `GJP_LOG_LEVEL=INFO`。DEBUG 级别会
    输出含 Token 的完整请求头，仅用于调试。
 
-5. **健康检查原理**：`update.sh` 发送 MCP `initialize` 握手请求验证
-   服务可用性，不涉及业务 API 调用，不会产生副作用。
+5. **健康检查原理**：部署脚本发送 MCP `initialize` 握手请求验证服务
+   可用性，不涉及业务 API 调用，不会产生副作用。
 
-6. **部署目录**：部署脚本自动定位自身所在仓库根目录（`deploy/` 的上一级），
-   克隆到哪里就从哪里运行，无需配置；也可通过 `PROJECT_DIR` 环境变量或
-   脚本参数显式指定，例如 `sudo ./install-service.sh /root/gjp-print-mcp`。
+6. **部署目录**：部署脚本自动定位自身所在仓库根目录（`scripts/` 的上一级），
+   克隆到哪里就从哪里运行，无需配置；也可通过 `DEPLOY_DIR` 环境变量显式指定。

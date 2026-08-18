@@ -45,7 +45,7 @@ MCP 只发布 `getPrintInfo`、`newStyle`、`saveStyle`。视觉模型识别用�
 src/
 ├── yunprint/                  # 打印服务包：App、ToolSet、Port、Adapter、Prompt、MCP
 └── gjp_common/                # 业务无关公共层：上下文、连接、MCP、配置、路径、日志
-deploy/                        # Linux 服务器部署脚本：install-service、update、rollback
+scripts/                       # Linux 服务器部署脚本：deploy.sh 一键部署
 ```
 
 `ToolSet` 是 Agent 与 MCP 的唯一工具来源。`create_print_mcp_service` 有 `isinstance` 类型守卫，确保只发布 `PrintToolSet`。`TemplateConversationStore` 仅保存三个工具间的当前模板 JSON 和修订号，不定义工具。
