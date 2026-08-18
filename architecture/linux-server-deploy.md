@@ -6,6 +6,7 @@ yunprint-print MCP 服务在 Linux 服务器（CentOS / Ubuntu / Debian 等）�
 
 ## 目录
 
+- [部署信息概览](#部署信息概览)
 - [架构概览](#架构概览)
 - [前置条件](#前置条件)
 - [首次部署](#首次部署)
@@ -15,6 +16,26 @@ yunprint-print MCP 服务在 Linux 服务器（CentOS / Ubuntu / Debian 等）�
 - [临时 DEBUG 调试](#临时-debug-调试)
 - [运维速查](#运维速查)
 - [故障排查](#故障排查)
+
+---
+
+## 部署信息概览
+
+| 项目 | 值 |
+|---|---|
+| 代码仓库 | `https://github.com/757607106/gjp-print-mcp.git` |
+| 生产分支 | `main` |
+| MCP 服务名 | `yunprint-print` |
+| 服务端口 | `8931`（仅本机监听，经 Nginx 对外） |
+| 对外域名 | `yunprintai.gmgrasp.com.cn` |
+| MCP 端点 | `POST /mcp`（Streamable HTTP）、`GET /sse`（SSE 兼容） |
+| 对外 MCP 地址 | `https://yunprintai.gmgrasp.com.cn/mcp` |
+| 服务器 | 阿里云 ECS（Alibaba Cloud Linux 3，公网 IP 47.109.129.129） |
+| 部署目录 | `/root/gjp-print-mcp` |
+| systemd 服务名 | `yunprint-print` |
+| Nginx 配置 | `/etc/nginx/conf.d/yunprintai.gmgrasp.com.cn.conf` |
+| SSL 证书 | `/usr/local/vango/certificate/gmgrasp.com.cn.pem` + `.key` |
+| nohup 日志 | `/var/log/yunprint-print-mcp.log` |
 
 ---
 
@@ -122,15 +143,10 @@ uv 自动使用托管的 Python 3.11+ 创建虚拟环境。验证：
 
 ### 第 5 步：配置环境变量
 
-创建 `.env` 文件：
+一条命令创建 `.env` 文件：
 
 ```bash
-vim .env
-```
-
-写入以下内容（根据实际环境调整）：
-
-```dotenv
+cat > /root/gjp-print-mcp/.env <<'EOF'
 # === 通用日志配置 ===
 GJP_LOG_ENABLED=true
 GJP_LOG_LEVEL=INFO
@@ -144,6 +160,7 @@ YUNPRINT_BASE_URL=https://yunprint.gmgrasp.com.cn
 
 # 云打印 API 调用超时（秒）
 YUNPRINT_TIMEOUT_SECONDS=30
+EOF
 ```
 
 > **安全提示**：`.env` 文件被 `.gitignore` 排除，不会提交到 Git。
@@ -179,14 +196,15 @@ chmod +x scripts/deploy.sh
 
 ```bash
 # firewalld（CentOS / Alibaba Cloud Linux）
-firewall-cmd --permanent --add-port=8931/tcp
-firewall-cmd --reload
+systemctl is-active firewalld && firewall-cmd --permanent --add-port=8931/tcp && firewall-cmd --reload || echo "firewalld 未启用，请直接在阿里云安全组放行"
 
 # ufw（Ubuntu）
 ufw allow 8931/tcp
 ```
 
-> 云服务器（阿里云 / 腾讯云等）还需在控制台**安全组**中放行 TCP 8931。
+> **阿里云 ECS 实际情况**：本机 firewalld 通常未启用，端口管控在
+> **安全组**完成。走 Nginx HTTPS 代理后，安全组只需放行
+> **TCP 80 和 443**，8931 无需对公网开放。
 
 ### 第 8 步：systemd 服务化（生产推荐）
 
@@ -226,31 +244,53 @@ WantedBy=multi-user.target
 
 ### 第 9 步（可选）：Nginx 反向代理 + HTTPS
 
-生产环境建议在反向代理层配置 HTTPS。创建
-`/etc/nginx/conf.d/yunprint-print.conf`：
+生产环境通过服务器上已有的 Nginx（1.28.2）对外提供 HTTPS，
+对内 `proxy_pass` 到 127.0.0.1:8931。对外 MCP 地址为
+`https://yunprintai.gmgrasp.com.cn/mcp`。
 
-```nginx
+#### 9.1 运维配合事项（域名与证书）
+
+域名 `yunprintai.gmgrasp.com.cn` 属于 `gmgrasp.com.cn`，需要运维完成：
+
+| 事项 | 操作 |
+|---|---|
+| DNS 解析 | 添加 A 记录 `yunprintai` → 服务器公网 IP `47.109.129.129` |
+| SSL 证书 | 提供 `yunprintai.gmgrasp.com.cn` 证书，上传到 `/usr/local/vango/certificate/gmgrasp.com.cn.pem` 与 `.key` |
+| 安全组 | 阿里云安全组入方向放行 **TCP 80 和 443** |
+
+证书到位后先确认：
+
+```bash
+ls -l /usr/local/vango/certificate/gmgrasp.com.cn.pem /usr/local/vango/certificate/gmgrasp.com.cn.key
+```
+
+#### 9.2 创建 Nginx 配置
+
+```bash
+cat > /etc/nginx/conf.d/yunprintai.gmgrasp.com.cn.conf <<'EOF'
 server {
     listen 80;
-    server_name mcp.example.com;
+    server_name yunprintai.gmgrasp.com.cn;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name mcp.example.com;
+    server_name yunprintai.gmgrasp.com.cn;
 
-    ssl_certificate /path/to/cert.pem;
-    ssl_certificate_key /path/to/cert.key;
+    ssl_certificate /usr/local/vango/certificate/gmgrasp.com.cn.pem;
+    ssl_certificate_key /usr/local/vango/certificate/gmgrasp.com.cn.key;
     ssl_session_cache shared:SSL:1m;
     ssl_session_timeout 5m;
     ssl_ciphers HIGH:!aNULL:!MD5;
     ssl_prefer_server_ciphers on;
 
-    client_max_body_size 10m;
+    client_max_body_size 100m;
+    client_body_timeout 86400s;
+    client_header_timeout 86400s;
 
-    access_log /var/log/nginx/yunprint-print-access.log;
-    error_log /var/log/nginx/yunprint-print-error.log;
+    access_log /var/log/nginx/yunprintai-access.log;
+    error_log /var/log/nginx/yunprintai-error.log;
 
     location / {
         proxy_pass http://127.0.0.1:8931;
@@ -267,18 +307,32 @@ server {
         proxy_send_timeout 86400s;
     }
 }
+EOF
 ```
 
-测试并加载配置：
+#### 9.3 测试并重载
 
 ```bash
-nginx -t
-nginx -s reload
+nginx -t && nginx -s reload
 ```
 
+#### 9.4 公网全链路验证
+
+```bash
+curl -s -i -X POST https://yunprintai.gmgrasp.com.cn/mcp \
+  -H "Authorization: Bearer health-check" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"final-check","version":"1.0"}}}'
+```
+
+预期 HTTP `200`、响应头含 `mcp-session-id`、响应体 `serverInfo.name`
+为 `yunprint-print`，代表 DNS → HTTPS 证书 → Nginx → MCP 服务全链路打通。
+
 > 关键点：MCP 走 Streamable HTTP / SSE，需 `proxy_buffering off` 关闭缓冲
-> 以支持流式推送，`proxy_read_timeout` 设长以支持长连接。配置 HTTPS 后
-> 云服务器安全组只需放行 80/443，可关闭 8931 外网访问。
+> 以支持流式推送，`proxy_read_timeout` 设长以支持长连接。该 Nginx 上还
+> 托管其他站点（如 erp-billing MCP 的 `test-mcp-server.yuncyb.com`），
+> 新增配置文件互不影响。
 
 ---
 
