@@ -63,7 +63,7 @@ Linux 服务器
 
 ## 首次部署
 
-> 以下所有命令以 **root** 身份执行，部署目录默认 `/opt/gjp-print-mcp`。
+> 以下所有命令以 **root** 身份执行，部署目录默认 `/root/gjp-print-mcp`。
 
 ### 第 1 步：安装 Git
 
@@ -102,7 +102,7 @@ uv --version
 ### 第 3 步：克隆项目
 
 ```bash
-cd /opt
+cd /root
 git clone https://github.com/757607106/gjp-print-mcp.git
 cd gjp-print-mcp
 ```
@@ -166,7 +166,7 @@ ufw allow 8931/tcp
 ### 第 7 步：注册 systemd 服务
 
 ```bash
-cd /opt/gjp-print-mcp/deploy
+cd /root/gjp-print-mcp/deploy
 chmod +x install-service.sh update.sh rollback.sh
 sudo ./install-service.sh
 ```
@@ -187,8 +187,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/gjp-print-mcp
-ExecStart=/opt/gjp-print-mcp/.venv/bin/python -m yunprint --host 0.0.0.0 --port 8931
+WorkingDirectory=/root/gjp-print-mcp
+ExecStart=/root/gjp-print-mcp/.venv/bin/python -m yunprint --host 0.0.0.0 --port 8931
 Restart=on-failure
 RestartSec=5
 
@@ -201,7 +201,7 @@ WantedBy=multi-user.target
 ```
 [INFO] === 服务安装完成 ===
 服务名:   yunprint-print
-项目目录: /opt/gjp-print-mcp
+项目目录: /root/gjp-print-mcp
 监听地址: 0.0.0.0:8931
 ```
 
@@ -313,7 +313,7 @@ nginx -s reload
 ### 更新命令
 
 ```bash
-cd /opt/gjp-print-mcp/deploy
+cd /root/gjp-print-mcp/deploy
 sudo ./update.sh
 ```
 
@@ -359,7 +359,7 @@ sudo ./update.sh -b dev
 ### 回退到上一个提交
 
 ```bash
-cd /opt/gjp-print-mcp/deploy
+cd /root/gjp-print-mcp/deploy
 sudo ./rollback.sh
 ```
 
@@ -372,7 +372,7 @@ sudo ./rollback.sh abc1234
 ### 回滚后回到最新版本
 
 ```bash
-cd /opt/gjp-print-mcp
+cd /root/gjp-print-mcp
 git checkout main
 git pull
 cd deploy && sudo ./update.sh
@@ -425,7 +425,7 @@ systemctl restart yunprint-print
 
 ```bash
 # === 更新 ===
-cd /opt/gjp-print-mcp/deploy
+cd /root/gjp-print-mcp/deploy
 sudo ./update.sh                      # 一键更新
 sudo ./rollback.sh                    # 一键回滚
 
@@ -450,7 +450,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:8931/mcp \
 # 预期: 200
 
 # === Git ===
-cd /opt/gjp-print-mcp
+cd /root/gjp-print-mcp
 git log --oneline -5                  # 最近 5 个提交
 git rev-parse --short HEAD            # 当前版本号
 ```
@@ -486,7 +486,7 @@ journalctl -u yunprint-print -n 50 --no-pager
 
 ```bash
 # 1. 查看当前版本
-cd /opt/gjp-print-mcp
+cd /root/gjp-print-mcp
 git log --oneline -3
 
 # 2. 查看错误日志
@@ -512,7 +512,7 @@ systemctl restart yunprint-print
 ### Git reset 失败（本地有改动）
 
 ```bash
-cd /opt/gjp-print-mcp
+cd /root/gjp-print-mcp
 
 # 查看哪些文件被修改
 git status
@@ -527,7 +527,7 @@ cd deploy && sudo ./update.sh
 ### 依赖安装失败
 
 ```bash
-cd /opt/gjp-print-mcp
+cd /root/gjp-print-mcp
 
 # 删除虚拟环境重建
 rm -rf .venv
@@ -540,7 +540,7 @@ systemctl restart yunprint-print
 ### systemd 服务被删除（误操作）
 
 ```bash
-cd /opt/gjp-print-mcp/deploy
+cd /root/gjp-print-mcp/deploy
 sudo ./install-service.sh
 ```
 
@@ -566,6 +566,6 @@ sudo ./install-service.sh
 5. **健康检查原理**：`update.sh` 发送 MCP `initialize` 握手请求验证
    服务可用性，不涉及业务 API 调用，不会产生副作用。
 
-6. **部署目录**：脚本默认部署目录 `/opt/gjp-print-mcp`，其他目录通过
-   `PROJECT_DIR` 环境变量或脚本参数覆盖，例如
-   `sudo ./install-service.sh /root/gjp-print-mcp`。
+6. **部署目录**：部署脚本自动定位自身所在仓库根目录（`deploy/` 的上一级），
+   克隆到哪里就从哪里运行，无需配置；也可通过 `PROJECT_DIR` 环境变量或
+   脚本参数显式指定，例如 `sudo ./install-service.sh /root/gjp-print-mcp`。

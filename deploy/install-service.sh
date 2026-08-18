@@ -7,17 +7,18 @@
 # - 日志托管 journald（journalctl 查看，系统自动轮转）
 #
 # 用法：
-#   sudo ./install-service.sh                        # 默认部署目录 /opt/gjp-print-mcp
-#   sudo ./install-service.sh /root/gjp-print-mcp    # 指定项目目录
+#   sudo ./install-service.sh                        # 自动定位脚本所在仓库根目录
+#   sudo ./install-service.sh /root/gjp-print-mcp    # 显式指定项目目录
 #
 # 环境变量（可选覆盖默认值）：
-#   PROJECT_DIR   部署目录（默认 /opt/gjp-print-mcp）
+#   PROJECT_DIR   部署目录（默认自动定位脚本所在仓库根目录）
 #   HOST          监听地址（默认 0.0.0.0）
 #   PORT          监听端口（默认 8931）
 
 set -euo pipefail
 
-PROJECT_DIR="${PROJECT_DIR:-${1:-/opt/gjp-print-mcp}}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-${1:-$(dirname "$SCRIPT_DIR")}}"
 HOST="${HOST:-0.0.0.0}"
 PORT="${PORT:-8931}"
 SERVICE_NAME="yunprint-print"

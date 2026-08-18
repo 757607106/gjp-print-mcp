@@ -9,12 +9,13 @@
 #   sudo ./update.sh -b dev             # 更新指定分支
 #
 # 环境变量（可选覆盖默认值）：
-#   PROJECT_DIR   部署目录（默认 /opt/gjp-print-mcp）
+#   PROJECT_DIR   部署目录（默认自动定位脚本所在仓库根目录）
 #   PORT          服务端口（默认 8931）
 
 set -euo pipefail
 
-PROJECT_DIR="${PROJECT_DIR:-/opt/gjp-print-mcp}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$(dirname "$SCRIPT_DIR")}"
 PORT="${PORT:-8931}"
 BRANCH="main"
 SERVICE_NAME="yunprint-print"
