@@ -45,7 +45,7 @@ MCP 只发布 `getPrintInfo`、`newStyle`、`saveStyle`。视觉模型识别用�
 src/
 ├── yunprint/                  # 打印服务包：App、ToolSet、Port、Adapter、Prompt、MCP
 └── gjp_common/                # 业务无关公共层：上下文、连接、MCP、配置、路径、日志
-deploy/                        # Windows Server 部署脚本：install-service、update、rollback
+deploy/                        # Linux 服务器部署脚本：install-service、update、rollback
 ```
 
 `ToolSet` 是 Agent 与 MCP 的唯一工具来源。`create_print_mcp_service` 有 `isinstance` 类型守卫，确保只发布 `PrintToolSet`。`TemplateConversationStore` 仅保存三个工具间的当前模板 JSON 和修订号，不定义工具。
@@ -72,7 +72,7 @@ deploy/                        # Windows Server 部署脚本：install-service�
 - `architecture/saas-mcp-integration.md` — SaaS 对话页与 MCP 租户连接方案
 - `architecture/tool-api-reference.md` — 三个工具与业务 API 契约
 - `architecture/local-ngrok-setup.md` — 本地 ngrok 内网穿透启动指南
-- `architecture/windows-server-deploy.md` — Windows Server 2019 部署与更新指南
+- `architecture/linux-server-deploy.md` — Linux 服务器部署与更新指南
 
 ### 本地开发
 

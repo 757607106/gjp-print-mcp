@@ -191,7 +191,7 @@ Streamable HTTP。生产环境应在反向代理层配置 HTTPS。
 > 当前多轮模板状态保存在进程内存中，因此必须使用单 worker。
 > 启用 Redis/数据库共享状态后才能安全扩展为多 worker 或多副本。
 
-Windows Server 部署见 [Windows Server 部署与更新指南](architecture/windows-server-deploy.md)。
+Linux 服务器部署见 [Linux 服务器部署与更新指南](architecture/linux-server-deploy.md)。
 
 ## 连接 MCP
 
